@@ -59,7 +59,8 @@ def load_model(model_file, cuda, learning_rate, beta_0, beta_1):
     prev_epoch = from_before['epoch']
     dataset = from_before['train_set']
     memory = from_before['memory']
-    optimizer_state_dict = from_before['optimizer']
+    disc_optimizer_state_dict = from_before['disc_optimizer']
+    gen_optimizer_state_dict = from_before['gen_optimizer']
 
     # load generator and discriminator
     if memory:
@@ -72,21 +73,22 @@ def load_model(model_file, cuda, learning_rate, beta_0, beta_1):
 
     gan.load_state_dict(gan_state_dict)
 
-    optimizer = optim.Adam(gan.parameters(), lr=learning_rate, betas=(beta_0, beta_1), eps=1e-8)
-    optimizer.load_state_dict(optimizer_state_dict)
-
+    disc_optimizer = optim.Adam(gan.dmn.parameters(), lr=learning_rate, betas=(beta_0, beta_1), eps=1e-8)
+    gen_optimizer = optim.Adam(gan.mcgn.parameters(), lr=learning_rate, betas=(beta_0, beta_1), eps=1e-8)
+    disc_optimizer.load_state_dict(disc_optimizer_state_dict)
+    gen_optimizer.load_state_dict(gen_optimizer_state_dict)
 
     return total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, \
-           disc_loss_per_epoch, prev_epoch, gan, optimizer, memory
+           disc_loss_per_epoch, prev_epoch, gan, disc_optimizer, gen_optimizer, memory
 
 
 def create_new_model(dataset, cuda, learning_rate, beta_0, beta_1, memory):
     if memory:
-        gan = MemGAN(dataset)
+        gan = MemGAN(dataset, cuda=cuda)
     else:
         gan = GAN(dataset)
 
-    fixed_noise = torch.randn(9, gan.mcgn.z_dim)
+    fixed_noise = torch.randn(9, gan.z_dim)
 
     if cuda:
         gan.cuda()
@@ -100,7 +102,8 @@ def create_new_model(dataset, cuda, learning_rate, beta_0, beta_1, memory):
     prev_epoch = 0
 
     # Adam optimizer
-    optimizer = optim.Adam(gan.parameters(), lr=learning_rate, betas=(beta_0, beta_1), eps=1e-8)
+    disc_optimizer = optim.Adam(gan.dmn.parameters(), lr=learning_rate, betas=(beta_0, beta_1), eps=1e-8)
+    gen_optimizer = optim.Adam(gan.mcgn.parameters(), lr=learning_rate, betas=(beta_0, beta_1), eps=1e-8)
 
     return total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, \
-           disc_loss_per_epoch, prev_epoch, gan, optimizer
+           disc_loss_per_epoch, prev_epoch, gan, disc_optimizer, gen_optimizer

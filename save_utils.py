@@ -38,7 +38,7 @@ def save_image_sample(dataset, batch, cuda, total_examples, directory):
 
 
 def save_checkpoint(total_examples, gan, gen_losses, disc_losses, disc_loss_per_epoch, gen_loss_per_epoch,
-                    fixed_noise, epoch, directory, optimizer, train_set, memory):
+                    fixed_noise, epoch, directory, disc_optimizer, gen_optimizer, train_set, memory):
     basename = directory+"/example-{}".format(total_examples)
     model_fname = basename + ".model"
     state = {
@@ -50,7 +50,8 @@ def save_checkpoint(total_examples, gan, gen_losses, disc_losses, disc_loss_per_
         'gen_loss_per_epoch': gen_loss_per_epoch,
         'fixed_noise': fixed_noise,
         'epoch': epoch,
-        'optimizer': optimizer.state_dict(),
+        'disc_optimizer': disc_optimizer.state_dict(),
+        'gen_optimizer': gen_optimizer.state_dict(),
         'train_set': train_set,
         'memory': memory
     }
@@ -91,13 +92,14 @@ def save_learning_curve_epoch(gen_losses, disc_losses, total_epochs, directory):
 
 def save_all(total_examples, fixed_noise, gan, disc_loss_per_epoch, gen_loss_per_epoch, gen_losses,
              disc_losses, epoch, checkpoint_dir, cuda, gen_images_dir, train_summaries_dir,
-             optimizer, train_set, memory):
+             disc_optimizer, gen_optimizer, train_set, memory):
 
     save_checkpoint(total_examples=total_examples, fixed_noise=fixed_noise, gan=gan,
                     disc_loss_per_epoch=disc_loss_per_epoch,
                     gen_loss_per_epoch=gen_loss_per_epoch,
                     gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch, directory=checkpoint_dir,
-                    optimizer=optimizer, train_set=train_set, memory=memory)
+                    disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer,
+                    train_set=train_set, memory=memory)
     print("Checkpoint saved!")
 
     # sample images for inspection

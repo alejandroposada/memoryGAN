@@ -20,12 +20,12 @@ class dmn(nn.Module):
         self.bn1 = nn.BatchNorm2d(2*self.f_dim)
         self.conv3 = nn.Conv2d(in_channels=self.f_dim*2, out_channels=4 * self.f_dim, kernel_size=4, stride=2)
         self.bn2 = nn.BatchNorm2d(4 * self.f_dim)
-        self.conv4 = nn.Conv2d(in_channels=self.f_dim*4, out_channels=self.key_dim, kernel_size=4, stride=4)
+        self.conv4 = nn.Conv2d(in_channels=self.f_dim*4, out_channels=self.key_dim, kernel_size=1, stride=1)
 
     def forward(self, x):
         h = F.leaky_relu(self.conv1(x), 0.2)
-        h = F.leaky_relu(self.bn1(self.conv2(h), 0.2))
-        h = F.leaky_relu(self.bn2(self.conv3(h), 0.2))
-        h = F.leaky_relu(self.conv4(h), 0.2)
-        q = h.view(h.size(0), -1)
+        h = F.leaky_relu(self.bn1(self.conv2(h)), 0.2)
+        h = F.leaky_relu(self.bn2(self.conv3(h)), 0.2)
+        q = F.leaky_relu(self.conv4(h), 0.2)
+        q = q.view(q.size(0), -1)
         return q

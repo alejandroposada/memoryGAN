@@ -1,9 +1,8 @@
 import torch
 
-def train_step_memory(gan, batch_size, label_smoothing, cuda, true_batch, loss, grad_clip, optimizer):
-    pass
 
-def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss, grad_clip, optimizer):
+def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss,
+               grad_clip, disc_optimizer, gen_optimizer, memory):
     gan.dmn.zero_grad()
 
     #  hack 6 of https://github.com/soumith/ganhacks
@@ -18,7 +17,7 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss, grad_cl
         true_target = true_target.cuda()
 
     # train discriminator on true data
-    true_disc_result = gan.dmn.forward(true_batch)
+    true_disc_result = gan.discriminate(true_batch)
     disc_train_loss_true = loss(true_disc_result.squeeze(), true_target)
     disc_train_loss_true.backward()
     torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
@@ -36,12 +35,12 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss, grad_cl
         z = torch.randn(batch_size, gan.mcgn.z_dim)
 
     # train discriminator on fake data
-    fake_batch = gan.mcgn.forward(z.view(-1, gan.mcgn.z_dim, 1, 1))
-    fake_disc_result = gan.dmn.forward(fake_batch.detach())  # detach so gradients not computed for generator
+    fake_batch = gan.generate(z.view(-1, gan.mcgn.z_dim, 1, 1))
+    fake_disc_result = gan.discriminate(fake_batch.detach())  # detach so gradients not computed for generator
     disc_train_loss_false = loss(fake_disc_result.squeeze(), fake_target)
     disc_train_loss_false.backward()
     torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
-    optimizer.step()  # set for discriminator only
+    disc_optimizer.step()  # set for discriminator only
 
     #  compute performance statistics
     disc_train_loss = disc_train_loss_true + disc_train_loss_false
@@ -63,12 +62,12 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss, grad_cl
 
     # train generator
     gan.mcgn.zero_grad()
-    fake_batch = gan.mcgn.forward(z.view(-1, gan.mcgn.z_dim, 1, 1))
-    disc_result = gan.dmn.forward(fake_batch)
+    fake_batch = gan.generate(z.view(-1, gan.mcgn.z_dim, 1, 1))
+    disc_result = gan.discriminate(fake_batch)
     gen_train_loss = loss(disc_result.squeeze(), true_target)
 
     gen_train_loss.backward()
     torch.nn.utils.clip_grad_norm_(gan.mcgn.parameters(), grad_clip)
-    optimizer.step()  # set for generator only
+    gen_optimizer.step()  # set for generator only
 
     return disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy

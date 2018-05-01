@@ -10,7 +10,8 @@ import numpy as np
 # from project
 from load_utils import load_dataset, create_new_model, load_model
 from save_utils import save_learning_curve_epoch, save_all
-from train_utils import train_step, train_step_memory
+from train_utils import train_step
+
 
 def main():
     #  load datasets
@@ -20,7 +21,7 @@ def main():
     if args.model_file:
         try:
             total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, \
-            disc_loss_per_epoch, prev_epoch, gan, optimizer, memory \
+            disc_loss_per_epoch, prev_epoch, gan, disc_optimizer, gen_optimizer, memory \
                 = load_model(args.model_file, args.cuda, args.learning_rate, args.beta_0, args.beta_1)
             print('model loaded successfully! resuming from step {}'.format(prev_epoch))
             args.memory = memory   # prevents any contradictions during loading
@@ -31,7 +32,7 @@ def main():
     if not args.model_file:
         print('creating new model...')
         total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, disc_loss_per_epoch, \
-        prev_epoch, gan, optimizer \
+        prev_epoch, gan, disc_optimizer, gen_optimizer \
             = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0, args.beta_1, args.memory)
 
     # Binary Cross Entropy loss
@@ -58,16 +59,10 @@ def main():
             disc_losses_epoch = []
             gen_losses_epoch = []
             for idx, (true_batch, _) in enumerate(train_loader):
-                if args.memory:
-                    disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
-                        = train_step_memory(gan=gan, batch_size=args.batch_size, label_smoothing=args.label_smoothing,
-                                            cuda=args.cuda, true_batch=true_batch, loss=BCE_loss,
-                                            grad_clip=args.grad_clip, optimizer=optimizer)
-                else:
-                    disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
+                disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
                         = train_step(gan=gan, batch_size=args.batch_size, label_smoothing=args.label_smoothing,
                                      cuda=args.cuda, true_batch=true_batch, loss=BCE_loss, grad_clip=args.grad_clip,
-                                     optimizer=optimizer)
+                                     disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer, memory=args.memory)
 
                 if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                     print('epoch {}: step {}/{} disc true acc: {:.4f} disc fake acc: {:.4f} '
@@ -86,7 +81,8 @@ def main():
                              gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch,
                              checkpoint_dir=checkpoint_dir, cuda=args.cuda,
                              gen_images_dir=gen_images_dir, train_summaries_dir=train_summaries_dir,
-                             optimizer=optimizer, train_set=args.train_set, memory=args.memory)
+                             disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer,
+                             train_set=args.train_set, memory=args.memory)
 
                 #  Collect information per epoch
                 disc_losses_epoch.append(disc_train_loss.item())
@@ -111,9 +107,9 @@ def main():
         save_all(total_examples=total_examples, fixed_noise=fixed_noise, gan=gan,
                  disc_loss_per_epoch=disc_loss_per_epoch, gen_loss_per_epoch=gen_loss_per_epoch,
                  gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch,
-                 checkpoint_dir=checkpoint_dir, cuda=args.cuda,
-                 gen_images_dir=gen_images_dir, train_summaries_dir=train_summaries_dir,
-                 optimizer=optimizer, train_set=args.train_set, memory=args.memory)
+                 checkpoint_dir=checkpoint_dir, cuda=args.cuda, gen_images_dir=gen_images_dir,
+                 train_summaries_dir=train_summaries_dir, disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer,
+                 train_set=args.train_set, memory=args.memory)
 
 
 if __name__ == '__main__':
@@ -134,7 +130,7 @@ if __name__ == '__main__':
     argparser.add_argument('--checkpoint_interval', type=int, default=32000)  # 32000
     argparser.add_argument('--seed', type=int, default=1024)
     argparser.add_argument('--label_smoothing', action='store_true', default=True)
-    argparser.add_argument('--memory', action='store_true', default=False)  # use memory?
+    argparser.add_argument('--memory', action='store_true', default=True)  # use memory?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()
 
