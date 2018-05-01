@@ -8,9 +8,9 @@ import torch.nn as nn
 import numpy as np
 
 # from project
-from train_utils import load_dataset, load_model, create_new_model
+from load_utils import load_dataset, create_new_model, load_model
 from save_utils import save_learning_curve_epoch, save_all
-
+from train_utils import train_step, train_step_memory
 
 def main():
     #  load datasets
@@ -20,18 +20,19 @@ def main():
     if args.model_file:
         try:
             total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, \
-            disc_loss_per_epoch, prev_epoch, gan, disc_optimizer, gen_optimizer \
-                = load_model(args.model_file, args.cuda)
-            print('model loaded successfully!')
+            disc_loss_per_epoch, prev_epoch, gan, optimizer, memory \
+                = load_model(args.model_file, args.cuda, args.learning_rate, args.beta_0, args.beta_1)
+            print('model loaded successfully! resuming from step {}'.format(prev_epoch))
+            args.memory = memory   # prevents any contradictions during loading
         except:
             print('could not load model! creating new model...')
             args.model_file = None
 
     if not args.model_file:
         print('creating new model...')
-        total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, \
-        disc_loss_per_epoch, prev_epoch, gan, disc_optimizer, gen_optimizer \
-            = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0, args.beta_1)
+        total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, disc_loss_per_epoch, \
+        prev_epoch, gan, optimizer \
+            = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0, args.beta_1, args.memory)
 
     # Binary Cross Entropy loss
     BCE_loss = nn.BCEWithLogitsLoss()
@@ -53,78 +54,20 @@ def main():
 
     try:
         for epoch in range(prev_epoch, args.n_epochs):
+
             disc_losses_epoch = []
             gen_losses_epoch = []
             for idx, (true_batch, _) in enumerate(train_loader):
-                gan.dmn.zero_grad()
-
-                #  hack 6 of https://github.com/soumith/ganhacks
-                if args.label_smoothing:
-                    true_target = torch.FloatTensor(args.batch_size).uniform_(0.7, 1.2)
+                if args.memory:
+                    disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
+                        = train_step_memory(gan=gan, batch_size=args.batch_size, label_smoothing=args.label_smoothing,
+                                            cuda=args.cuda, true_batch=true_batch, loss=BCE_loss,
+                                            grad_clip=args.grad_clip, optimizer=optimizer)
                 else:
-                    true_target = torch.ones(args.batch_size)
-
-                #  Sample  minibatch  of examples from data generating distribution
-                if args.cuda:
-                    true_batch = true_batch.cuda()
-                    true_target = true_target.cuda()
-
-                #  train discriminator on true data
-                true_disc_result = gan.dmn.forward(true_batch)
-                disc_train_loss_true = BCE_loss(true_disc_result.squeeze(), true_target)
-                disc_train_loss_true.backward()
-                torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), args.grad_clip)
-
-                #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
-                if args.label_smoothing:
-                    fake_target = torch.FloatTensor(args.batch_size).uniform_(0, 0.3)
-                else:
-                    fake_target = torch.zeros(args.batch_size)
-
-                if args.cuda:
-                    z = torch.randn(args.batch_size, gan.mcgn.z_dim).cuda()
-                    fake_target = fake_target.cuda()
-                else:
-                    z = torch.randn(args.batch_size, gan.mcgn.z_dim)
-
-                #  train discriminator on fake data
-                fake_batch = gan.mcgn.forward(z.view(-1, gan.mcgn.z_dim, 1, 1))
-                fake_disc_result = gan.dmn.forward(fake_batch.detach())  # detach so gradients not computed for generator
-                disc_train_loss_false = BCE_loss(fake_disc_result.squeeze(), fake_target)
-                disc_train_loss_false.backward()
-                torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), args.grad_clip)
-                disc_optimizer.step()
-
-                #  compute performance statistics
-                disc_train_loss = disc_train_loss_true + disc_train_loss_false
-                disc_losses_epoch.append(disc_train_loss.item())
-
-
-                disc_fake_accuracy = 1 - torch.sum(fake_disc_result>0).item()/args.batch_size
-                disc_true_accuracy = torch.sum(true_disc_result>0).item()/args.batch_size
-
-                #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
-                if args.label_smoothing:
-                    true_target = torch.FloatTensor(args.batch_size).uniform_(0.7, 1.2)
-                else:
-                    true_target = torch.ones(args.batch_size)
-
-                if args.cuda:
-                    z = torch.randn(args.batch_size, gan.mcgn.z_dim).cuda()
-                    true_target = true_target.cuda()
-                else:
-                    z = torch.rand(args.batch_size, gan.mcgn.z_dim)
-
-                # train generator
-                gan.mcgn.zero_grad()
-                fake_batch = gan.mcgn.forward(z.view(-1, gan.mcgn.z_dim, 1, 1))
-                disc_result = gan.dmn.forward(fake_batch)
-                gen_train_loss = BCE_loss(disc_result.squeeze(), true_target)
-
-                gen_train_loss.backward()
-                torch.nn.utils.clip_grad_norm_(gan.mcgn.parameters(), args.grad_clip)
-                gen_optimizer.step()
-                gen_losses_epoch.append(gen_train_loss.item())
+                    disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
+                        = train_step(gan=gan, batch_size=args.batch_size, label_smoothing=args.label_smoothing,
+                                     cuda=args.cuda, true_batch=true_batch, loss=BCE_loss, grad_clip=args.grad_clip,
+                                     optimizer=optimizer)
 
                 if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                     print('epoch {}: step {}/{} disc true acc: {:.4f} disc fake acc: {:.4f} '
@@ -143,7 +86,11 @@ def main():
                              gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch,
                              checkpoint_dir=checkpoint_dir, cuda=args.cuda,
                              gen_images_dir=gen_images_dir, train_summaries_dir=train_summaries_dir,
-                             gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, train_set=args.train_set)
+                             optimizer=optimizer, train_set=args.train_set, memory=args.memory)
+
+                #  Collect information per epoch
+                disc_losses_epoch.append(disc_train_loss.item())
+                gen_losses_epoch.append(gen_train_loss.item())
 
             disc_loss_per_epoch.append(np.average(disc_losses_epoch))
             gen_loss_per_epoch.append(np.average(gen_losses_epoch))
@@ -166,7 +113,7 @@ def main():
                  gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch,
                  checkpoint_dir=checkpoint_dir, cuda=args.cuda,
                  gen_images_dir=gen_images_dir, train_summaries_dir=train_summaries_dir,
-                 gen_optimizer=gen_optimizer, disc_optimizer=disc_optimizer, train_set=args.train_set)
+                 optimizer=optimizer, train_set=args.train_set, memory=args.memory)
 
 
 if __name__ == '__main__':
@@ -181,11 +128,13 @@ if __name__ == '__main__':
     argparser.add_argument('--beta_0', type=float, default=0.5)
     argparser.add_argument('--beta_1', type=float, default=0.999)
     argparser.add_argument('--model_file', type=str, default=None)
+    #  --model_file results/checkpoints/example-28928.model
     argparser.add_argument('--cuda', action='store_true', default=True)
     argparser.add_argument('--display_result_every', type=int, default=640)   # 640
     argparser.add_argument('--checkpoint_interval', type=int, default=32000)  # 32000
     argparser.add_argument('--seed', type=int, default=1024)
     argparser.add_argument('--label_smoothing', action='store_true', default=True)
+    argparser.add_argument('--memory', action='store_true', default=False)  # use memory?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()
 
