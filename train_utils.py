@@ -17,7 +17,8 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss,
         true_target = true_target.cuda()
 
     # train discriminator on true data
-    true_disc_result = gan.discriminate(true_batch)
+    true_disc_result = gan.discriminate(true_batch, true_target)
+
     disc_train_loss_true = loss(true_disc_result.squeeze(), true_target)
     disc_train_loss_true.backward()
     torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
@@ -29,14 +30,14 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss,
         fake_target = torch.zeros(batch_size)
 
     if cuda:
-        z = torch.randn(batch_size, gan.mcgn.z_dim).cuda()
+        z = torch.randn(batch_size, gan.z_dim).cuda()
         fake_target = fake_target.cuda()
     else:
-        z = torch.randn(batch_size, gan.mcgn.z_dim)
+        z = torch.randn(batch_size, gan.z_dim)
 
     # train discriminator on fake data
-    fake_batch = gan.generate(z.view(-1, gan.mcgn.z_dim, 1, 1))
-    fake_disc_result = gan.discriminate(fake_batch.detach())  # detach so gradients not computed for generator
+    fake_batch = gan.generate(z.view(-1, gan.z_dim, 1, 1))
+    fake_disc_result = gan.discriminate(fake_batch.detach(), fake_target)  # detach so gradients not computed for generator
     disc_train_loss_false = loss(fake_disc_result.squeeze(), fake_target)
     disc_train_loss_false.backward()
     torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
@@ -63,7 +64,7 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss,
     # train generator
     gan.mcgn.zero_grad()
     fake_batch = gan.generate(z.view(-1, gan.mcgn.z_dim, 1, 1))
-    disc_result = gan.discriminate(fake_batch)
+    disc_result = gan.discriminate(fake_batch, fake_target)
     gen_train_loss = loss(disc_result.squeeze(), true_target)
 
     gen_train_loss.backward()
