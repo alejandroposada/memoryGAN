@@ -29,11 +29,14 @@ class GAN(nn.Module):
                          z_dim=self.z_dim, c_dim=self.c_dim)
         self.memory = memory(key_dim=self.key_dim, memory_size=self.mem_size, choose_k=self.choose_k, cuda=cuda)
 
-    def discriminate(self, x):
+    def discriminate(self, x, label):
         q = self.dmn.forward(x)  # get query vec
         qn = torch.norm(q, p=2, dim=1).detach()  # l2 normalize
         q = q.div(torch.transpose(qn.expand(256, 128), 1, 0))
         post_prob = self.memory.query(q)
+        self.memory.update_memory(q, label)
+
+        return post_prob
 
 
 

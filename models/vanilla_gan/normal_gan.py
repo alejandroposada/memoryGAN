@@ -26,7 +26,7 @@ class GAN(nn.Module):
         self.mcgn = gen(f_dim=self.f_dim, fc_dim=self.fc_dim,
                         z_dim=self.z_dim, c_dim=self.c_dim)
 
-    def discriminate(self, x):
+    def discriminate(self, x, label):
         return self.dmn.forward(x)
 
     def generate(self, z):
