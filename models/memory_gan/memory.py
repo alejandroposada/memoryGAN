@@ -65,6 +65,7 @@ class memory(nn.Module):
 
         #  compute P(c|x, v_c=y) from eq 1 of paper
         p_c_given_x = (p_x_given_c_unnorm*p_c).detach()
+
         p_v_c_eq_y = torch.ger(label, self.memory_values) + torch.ger(1-label, 1-self.memory_values)
         p_c_given_x_v = (p_c_given_x*p_v_c_eq_y).detach()
         p_c_given_x_v_approx, idx = torch.topk(p_c_given_x_v, k=self.choose_k)
@@ -76,28 +77,33 @@ class memory(nn.Module):
         for i, l in enumerate(s_with_correct_label):
             if not l.any():
                 #  find oldest memory slot and copy information onto it
-                pass
+                oldest_idx = torch.argmax(self.memory_age)
+                self.memory_key[oldest_idx] = q[i]
+                self.memory_hist[oldest_idx] = self.memory_hist.mean()
+                self.memory_age[oldest_idx] = 0
+                self.memory_values[oldest_idx] = label[i]
             else:
+                idx_to_change = idx[i, l == 1]
                 gamma = 0
                 alpha = 0.5
-                h_hat = alpha * self.memory_hist
-                k_hat = self.memory_key
+                h_hat = alpha * self.memory_hist[idx_to_change]
+                k_hat = self.memory_key[idx_to_change]
                 for _ in range(n_steps):
                     #  E Step
                     similarities = torch.matmul(q[i], torch.transpose(k_hat, 1, 0)).detach()
                     p_x_given_c_unnorm = torch.exp(similarities).detach()
                     p_c = ((h_hat + self.beta) / torch.sum(h_hat + self.beta)).detach()
                     p_c_given_x = (p_x_given_c_unnorm * p_c).detach()
-                    next_gamma = (p_c_given_x / p_c_given_x.sum(1)).detach()
+                    next_gamma = (p_c_given_x / p_c_given_x.sum(0)).detach()
 
                     #  M step
                     h_hat += next_gamma - gamma
-                    k_hat += ((next_gamma - gamma) / h_hat) * (q[i] - k_hat)
-
+                    k_hat += torch.transpose(((next_gamma - gamma) / h_hat).expand(self.key_dim, len(h_hat)),0,1)*(q[i] - k_hat)
                     gamma = next_gamma
 
-                self.memory_key = k_hat
-                self.memory_hist = h_hat
+                k_hat = torch.norm(k_hat, p=2, dim=0).detach()  # l2 normalize
+                self.memory_key[idx_to_change] = k_hat
+                self.memory_hist[idx_to_change] = h_hat
 
 
 
