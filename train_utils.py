@@ -19,9 +19,9 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss,
     # train discriminator on true data
     true_disc_result = gan.discriminate(true_batch, true_target)
 
-    disc_train_loss_true = loss(true_disc_result.squeeze(), true_target)
-    disc_train_loss_true.backward()
-    torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
+    # disc_train_loss_true = loss(true_disc_result.squeeze(), true_target)
+    # disc_train_loss_true.backward()
+    # torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
     if label_smoothing:
@@ -38,13 +38,20 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss,
     # train discriminator on fake data
     fake_batch = gan.generate(z, batch_size)
     fake_disc_result = gan.discriminate(fake_batch.detach(), fake_target)  # detach so gradients not computed for generator
-    disc_train_loss_false = loss(fake_disc_result.squeeze(), fake_target)
-    disc_train_loss_false.backward()
+
+    # Calculate Dloss
+    disc_train_loss = gan.Dloss(true_disc_result, fake_disc_result)
+    disc_train_loss.backward()
     torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
     disc_optimizer.step()  # set for discriminator only
 
+    # disc_train_loss_false = loss(fake_disc_result.squeeze(), fake_target)
+    # disc_train_loss_false.backward()
+    # torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
+    # disc_optimizer.step()  # set for discriminator only
+
     #  compute performance statistics
-    disc_train_loss = disc_train_loss_true + disc_train_loss_false
+    # disc_train_loss = disc_train_loss_true + disc_train_loss_false
 
     disc_fake_accuracy = 1 - torch.sum(fake_disc_result > 0).item() / batch_size
     disc_true_accuracy = torch.sum(true_disc_result > 0).item() / batch_size
@@ -64,8 +71,9 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss,
     # train generator
     gan.mcgn.zero_grad()
     fake_batch = gan.generate(z, batch_size)
-    disc_result = gan.discriminate(fake_batch, fake_target)
-    gen_train_loss = loss(disc_result.squeeze(), true_target)
+    disc_result = gan.discriminate(fake_batch, true_target)
+    # gen_train_loss = loss(disc_result.squeeze(), true_target)
+    gen_train_loss = gan.Gloss(disc_result)
 
     gen_train_loss.backward()
     torch.nn.utils.clip_grad_norm_(gan.mcgn.parameters(), grad_clip)

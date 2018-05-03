@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import torch.nn.functional as F
 
 from models.config import config
 from models.memory_gan.mcgn import mcgn
@@ -34,6 +35,7 @@ class GAN(nn.Module):
         q = self.dmn.forward(x)  # get query vec
         qn = torch.norm(q, p=2, dim=1).detach()  # l2 normalize
         q = q.div(torch.transpose(qn.expand(256, q.size(0)), 1, 0))
+        self.q = q
         post_prob = self.memory.query(q)
         self.memory.update_memory(q, label)
 
@@ -45,7 +47,18 @@ class GAN(nn.Module):
         else:
             key = self.memory.sample_key(batch_size)
 
+        self.key = key
         gen_input = torch.cat((z, key), dim=1)
         fake_batch = self.mcgn.forward(gen_input)
 
         return fake_batch
+
+    def Dloss(self, true_output, fake_output):
+        gamma = 0.000002
+        I_hat = -torch.mean(F.cosine_similarity(self.key, self.q))
+        return -torch.mean(torch.log(true_output)) - torch.mean(torch.log(1 - fake_output)) + gamma*I_hat
+
+    def Gloss(self, fake_output):
+        gamma = 0.000002
+        I_hat = -torch.mean(F.cosine_similarity(self.key, self.q))
+        return torch.mean(torch.log(1 - fake_output)) + gamma*I_hat
