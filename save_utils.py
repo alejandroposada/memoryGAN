@@ -103,7 +103,13 @@ def save_all(total_examples, fixed_noise, gan, disc_loss_per_epoch, gen_loss_per
     print("Checkpoint saved!")
 
     # sample images for inspection
-    save_image_sample(batch=gan.mcgn.forward(fixed_noise.view(-1, gan.mcgn.z_dim, 1, 1)),
+    if cuda:
+        key = gan.memory.sample_key(fixed_noise.size(0)).cuda()
+    else:
+        key = gan.memory.sample_key(fixed_noise.size(0))
+
+    gen_input = torch.cat((fixed_noise, key), dim=1)
+    save_image_sample(batch=gan.mcgn.forward(gen_input),
                       cuda=cuda, total_examples=total_examples, directory=gen_images_dir, dataset=train_set)
     print("Saved images!")
 

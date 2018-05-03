@@ -25,8 +25,8 @@ class GAN(nn.Module):
         self.z_dim = config_vars.z_dim
 
         self.dmn = dmn(f_dim=self.f_dim, fc_dim=self.fc_dim, key_dim=self.key_dim)
-        self.mcgn = mcgn(f_dim=self.f_dim, fc_dim=self.fc_dim,
-                         z_dim=self.z_dim, c_dim=self.c_dim)
+        self.mcgn = mcgn(f_dim=self.f_dim, fc_dim=self.fc_dim, z_dim=self.z_dim,
+                         c_dim=self.c_dim, key_dim=self.key_dim)
         self.memory = memory(key_dim=self.key_dim, memory_size=self.mem_size, choose_k=self.choose_k, cuda=cuda)
 
     def discriminate(self, x, label):
