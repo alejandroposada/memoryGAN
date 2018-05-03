@@ -23,6 +23,7 @@ class GAN(nn.Module):
         self.f_dim = config_vars.f_dim
         self.choose_k = config_vars.choose_k
         self.z_dim = config_vars.z_dim
+        self.cuda = cuda
 
         self.dmn = dmn(f_dim=self.f_dim, fc_dim=self.fc_dim, key_dim=self.key_dim)
         self.mcgn = mcgn(f_dim=self.f_dim, fc_dim=self.fc_dim, z_dim=self.z_dim,
@@ -38,6 +39,13 @@ class GAN(nn.Module):
 
         return post_prob
 
+    def generate(self, z, batch_size):
+        if self.cuda:
+            key = self.memory.sample_key(batch_size).cuda()
+        else:
+            key = self.memory.sample_key(batch_size)
 
+        gen_input = torch.cat((z, key), dim=1)
+        fake_batch = self.mcgn.forward(gen_input)
 
-
+        return fake_batch

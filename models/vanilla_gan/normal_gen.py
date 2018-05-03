@@ -23,7 +23,7 @@ class gen(nn.Module):
                                         kernel_size=4, stride=2)
 
     def forward(self, h):
-        x_new = F.leaky_relu(self.fc1(h.squeeze()), 0.2)
+        x_new = F.leaky_relu(self.fc1(h), 0.2)
         x_new = F.leaky_relu(self.fc2(x_new), 0.2)
         x_new = x_new.view(h.shape[0], self.f_dim * 2, 5, 5)
         x_new = F.leaky_relu(self.conv1(x_new, output_size=[13, 13]), 0.2)
