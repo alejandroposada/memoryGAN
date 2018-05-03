@@ -10,7 +10,7 @@ from models.memory_gan.memory import memory
 class GAN(nn.Module):
     """GAN
 	"""
-    def __init__(self, dataset, cuda):
+    def __init__(self, dataset, is_cuda):
         """
         """
         super(GAN, self).__init__()
@@ -23,12 +23,12 @@ class GAN(nn.Module):
         self.f_dim = config_vars.f_dim
         self.choose_k = config_vars.choose_k
         self.z_dim = config_vars.z_dim
-        self.cuda = cuda
+        self.is_cuda = is_cuda
 
         self.dmn = dmn(f_dim=self.f_dim, fc_dim=self.fc_dim, key_dim=self.key_dim)
         self.mcgn = mcgn(f_dim=self.f_dim, fc_dim=self.fc_dim, z_dim=self.z_dim,
                          c_dim=self.c_dim, key_dim=self.key_dim)
-        self.memory = memory(key_dim=self.key_dim, memory_size=self.mem_size, choose_k=self.choose_k, cuda=cuda)
+        self.memory = memory(key_dim=self.key_dim, memory_size=self.mem_size, choose_k=self.choose_k, cuda=is_cuda)
 
     def discriminate(self, x, label):
         q = self.dmn.forward(x)  # get query vec

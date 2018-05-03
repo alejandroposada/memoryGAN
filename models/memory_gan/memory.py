@@ -102,10 +102,9 @@ class memory(nn.Module):
                                              expand(self.key_dim, len(h_hat)), 0, 1)*(q[i] - k_hat)
                     gamma = next_gamma
 
-                k_hat = torch.norm(k_hat, p=2, dim=0).detach()  # l2 normalize
+                k_hat = (k_hat/torch.norm(k_hat, p=2, dim=0)).detach()  # l2 normalize
                 self.memory_key[idx_to_change] = k_hat
                 self.memory_hist[idx_to_change] = h_hat
-
 
     def sample_key(self, batch_size):
         real_hist = self.memory_hist * self.memory_values

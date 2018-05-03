@@ -43,8 +43,8 @@ def load_dataset(dataset, batch_size):
     return train_loader, test_loader
 
 
-def load_model(model_file, cuda, learning_rate, beta_0, beta_1):
-    if cuda:
+def load_model(model_file, is_cuda, learning_rate, beta_0, beta_1):
+    if is_cuda:
         from_before = torch.load(model_file)
     else:
         from_before = torch.load(model_file, map_location=lambda storage, loc: storage)
@@ -64,11 +64,11 @@ def load_model(model_file, cuda, learning_rate, beta_0, beta_1):
 
     # load generator and discriminator
     if memory:
-        gan = MemGAN(dataset)
+        gan = MemGAN(dataset, is_cuda)
     else:
         gan = GAN(dataset)
 
-    if cuda:
+    if is_cuda:
         gan.cuda()
 
     gan.load_state_dict(gan_state_dict)
@@ -82,15 +82,15 @@ def load_model(model_file, cuda, learning_rate, beta_0, beta_1):
            disc_loss_per_epoch, prev_epoch, gan, disc_optimizer, gen_optimizer, memory
 
 
-def create_new_model(dataset, cuda, learning_rate, beta_0, beta_1, memory):
+def create_new_model(dataset, is_cuda, learning_rate, beta_0, beta_1, memory):
     if memory:
-        gan = MemGAN(dataset, cuda=cuda)
+        gan = MemGAN(dataset, is_cuda)
     else:
         gan = GAN(dataset)
 
     fixed_noise = torch.randn(9, gan.z_dim)
 
-    if cuda:
+    if is_cuda:
         gan.cuda()
         fixed_noise = fixed_noise.cuda()
 
