@@ -16,11 +16,11 @@ class memory(nn.Module):
         self.choose_k = min(choose_k, self.memory_size)
 
         if cuda:
-            self.memory_key = torch.zeros([self.memory_size, self.key_dim]).cuda()
+            self.memory_key = torch.zeros([self.memory_size, self.key_dim]).cuda()  # K in 3.1 of paper
             self.memory_values = torch.ones([self.memory_size]).cuda()
-            self.memory_values[self.memory_size // 2:] = 0
-            self.memory_age = torch.zeros([self.memory_size]).cuda()
-            self.memory_hist = torch.FloatTensor(size=[self.memory_size]).cuda()
+            self.memory_values[self.memory_size // 2:] = 0                          # v in 3.1 of paper
+            self.memory_age = torch.zeros([self.memory_size]).cuda()                # a in 3.1 of paper
+            self.memory_hist = torch.FloatTensor(size=[self.memory_size]).cuda()    # h in 3.1 of paper
             self.memory_hist[:] = 1e-5
         else:
             self.memory_key = torch.zeros([self.memory_size, self.key_dim])              # K in 3.1 of paper
@@ -35,18 +35,18 @@ class memory(nn.Module):
         similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0)).detach()
         p_x_given_c_unnorm = torch.exp(similarities).detach()
 
-        #  compute P(c)
+        #  compute P(c)  # Roger: technically, you don't need to divide by the sum here (last equality in eq(3))
         p_c = ((self.memory_hist+self.beta)/torch.sum(self.memory_hist+self.beta)).detach()
 
         #  compute P(c|x) from eq 1 of paper
-        p_c_given_x = (p_x_given_c_unnorm*p_c).detach()
+        p_c_given_x = (p_x_given_c_unnorm * p_c).detach()
 
         #  take only top k
         p_c_given_x_approx, idxs = torch.topk(p_c_given_x, k=self.choose_k)
 
         #  compute P(y|x) = \sum_i P(c=i|x)v_i from eq 4 of paper
-        p_c_given_x_approx = (p_c_given_x_approx / p_c_given_x_approx.sum(1)).detach()
-        p_y_given_x = (self.memory_values[idxs]*p_c_given_x_approx).sum(1).detach()
+        p_y_given_x_unnorm = (self.memory_values[idxs] * p_c_given_x_approx).sum(1).detach()
+        p_y_given_x = (p_y_given_x_unnorm / p_c_given_x_approx.sum(1)).detach()
 
         #  clip values
         p_y_given_x[p_y_given_x < self.epsilon] = self.epsilon
@@ -64,7 +64,7 @@ class memory(nn.Module):
         p_c = ((self.memory_hist+self.beta)/torch.sum(self.memory_hist+self.beta)).detach()
 
         #  compute P(c|x, v_c=y) from eq 1 of paper
-        p_c_given_x = (p_x_given_c_unnorm*p_c).detach()
+        p_c_given_x = (p_x_given_c_unnorm * p_c).detach()
 
         p_v_c_eq_y = torch.ger(label, self.memory_values) + torch.ger(1-label, 1-self.memory_values)
         p_c_given_x_v = (p_c_given_x*p_v_c_eq_y).detach()
@@ -72,7 +72,7 @@ class memory(nn.Module):
 
         #  check if S contains correct label
         s_with_correct_label =\
-            torch.eq(self.memory_values[idx], torch.transpose(label.expand(len(label),len(label)), 0, 1))
+            torch.eq(self.memory_values[idx], torch.transpose(label.expand(self.choose_k, len(label)), 0, 1))
 
         for i, l in enumerate(s_with_correct_label):
             if not l.any():
@@ -98,39 +98,35 @@ class memory(nn.Module):
 
                     #  M step
                     h_hat += next_gamma - gamma
-                    k_hat += torch.transpose(((next_gamma - gamma) / h_hat).expand(self.key_dim, len(h_hat)),0,1)*(q[i] - k_hat)
+                    k_hat += torch.transpose(((next_gamma - gamma) / h_hat).
+                                             expand(self.key_dim, len(h_hat)), 0, 1)*(q[i] - k_hat)
                     gamma = next_gamma
 
                 k_hat = torch.norm(k_hat, p=2, dim=0).detach()  # l2 normalize
                 self.memory_key[idx_to_change] = k_hat
                 self.memory_hist[idx_to_change] = h_hat
 
+        # TO BE REMOVED FROM HERE. FOR DEBUGGING ONLY.
+        self.sample_key(64)
+
+    def sample_key(self, batch_size):
+        real_hist = self.memory_hist * self.memory_values
+        probs = real_hist / real_hist.sum(0)
+        print(probs)
 
 
 
-            #p_c_given_x_y_approx = []
 
-            #idxs = []
-            #for i, l in enumerate(label):
-            #    probs, idx = torch.topk(p_c_given_x[i, self.memory_values == l], k=self.choose_k)
-            #    p_c_given_x_y_approx.append(probs)
-            #    idxs.append(idx)
-
-            #p_c_given_x_y_approx = torch.stack(p_c_given_x_y_approx, 0)
-            #idxs = torch.stack(idxs, 0)
-
-            #p_c_given_x_y = p_c_given_x[:, self.memory_values == 1]
-
-            #  take only top k
-            #p_c_given_x_y_approx, idxs = torch.topk(p_c_given_x_y, k=self.choose_k)
-
-            #  compute gamma = P(c|x, v_c=y)
-
-
-            # M step
-
-            #  check if S_y contains the correct label y
-
+    # def sample_histogram(self, n, is_key=True):
+    #     real_hist = self.mem_hist * self.mem_vals
+    #     probs = real_hist / tf.reduce_sum(real_hist)
+    #     self.probs = probs
+    #     distr = tf.contrib.distributions.Categorical(probs=probs)
+    #     idxs = distr.sample(n)
+    #     if is_key:
+    #         sample_keys = tf.reshape(tf.gather(self.mem_keys, idxs), [n, -1])
+    #         return sample_keys
+    #     return tf.one_hot(idxs, self.memory_size)
 
 
 
