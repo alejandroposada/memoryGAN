@@ -32,7 +32,7 @@ class GAN(nn.Module):
     def discriminate(self, x, label):
         q = self.dmn.forward(x)  # get query vec
         qn = torch.norm(q, p=2, dim=1).detach()  # l2 normalize
-        q = q.div(torch.transpose(qn.expand(256, 128), 1, 0))
+        q = q.div(torch.transpose(qn.expand(256, q.size(0)), 1, 0))
         post_prob = self.memory.query(q)
         self.memory.update_memory(q, label)
 

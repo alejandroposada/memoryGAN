@@ -36,7 +36,7 @@ def main():
             = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0, args.beta_1, args.memory)
 
     # Binary Cross Entropy loss
-    BCE_loss = nn.BCEWithLogitsLoss()
+    BCE_loss = nn.BCEWithLogitsLoss()  # ROGER: Why with Logits?
 
     # results save folder
     gen_images_dir = 'results/generated_images'
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     argparser.add_argument('--train_set', type=str, default='fashion-mnist')
     argparser.add_argument('--learning_rate', type=float, default=0.0002)
     argparser.add_argument('--n_epochs', type=int, default=30)
-    argparser.add_argument('--batch_size', type=int, default=128)
+    argparser.add_argument('--batch_size', type=int, default=64)
     argparser.add_argument('--num_workers', type=int, default=8)
     argparser.add_argument('--beta_0', type=float, default=0.5)
     argparser.add_argument('--beta_1', type=float, default=0.999)

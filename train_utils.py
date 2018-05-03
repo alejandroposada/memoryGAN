@@ -59,7 +59,7 @@ def train_step(gan, batch_size, label_smoothing, cuda, true_batch, loss,
         z = torch.randn(batch_size, gan.mcgn.z_dim).cuda()
         true_target = true_target.cuda()
     else:
-        z = torch.rand(batch_size, gan.mcgn.z_dim)
+        z = torch.randn(batch_size, gan.mcgn.z_dim)
 
     # train generator
     gan.mcgn.zero_grad()
