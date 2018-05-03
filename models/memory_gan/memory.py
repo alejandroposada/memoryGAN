@@ -112,5 +112,4 @@ class memory(nn.Module):
         distrib = torch.distributions.Categorical(probs)
         sampled_idxs = distrib.sample(torch.Size([batch_size]))
         sample_keys = self.memory_key[sampled_idxs]
-        print(sample_keys.size())
         return sample_keys

@@ -42,7 +42,7 @@ class GAN(nn.Module):
         return post_prob
 
     def generate(self, z, batch_size):
-        if self.cuda:
+        if self.is_cuda:
             key = self.memory.sample_key(batch_size).cuda()
         else:
             key = self.memory.sample_key(batch_size)
@@ -50,7 +50,6 @@ class GAN(nn.Module):
         self.key = key
         gen_input = torch.cat((z, key), dim=1)
         fake_batch = self.mcgn.forward(gen_input)
-
         return fake_batch
 
     def Dloss(self, true_output, fake_output):
