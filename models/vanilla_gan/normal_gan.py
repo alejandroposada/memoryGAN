@@ -29,5 +29,5 @@ class GAN(nn.Module):
     def discriminate(self, x, label):
         return self.dmn.forward(x)
 
-    def generate(self, z):
+    def generate(self, z, batch_size):
         return self.mcgn.forward(z)
