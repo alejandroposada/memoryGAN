@@ -2,9 +2,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
+
 class memory(nn.Module):
-    """DISCRIMINATIVE MEMORY NETWORK
-	"""
+    """DISCRIMINATIVE MEMORY NETWORK """
     def __init__(self, key_dim, memory_size, choose_k, cuda):
         """
         """
@@ -106,33 +106,12 @@ class memory(nn.Module):
                 self.memory_key[idx_to_change] = k_hat
                 self.memory_hist[idx_to_change] = h_hat
 
-        # TO BE REMOVED FROM HERE. FOR DEBUGGING ONLY.
-        self.sample_key(64)
 
     def sample_key(self, batch_size):
         real_hist = self.memory_hist * self.memory_values
         probs = real_hist / real_hist.sum(0)
-        print(probs)
-
-
-
-
-    # def sample_histogram(self, n, is_key=True):
-    #     real_hist = self.mem_hist * self.mem_vals
-    #     probs = real_hist / tf.reduce_sum(real_hist)
-    #     self.probs = probs
-    #     distr = tf.contrib.distributions.Categorical(probs=probs)
-    #     idxs = distr.sample(n)
-    #     if is_key:
-    #         sample_keys = tf.reshape(tf.gather(self.mem_keys, idxs), [n, -1])
-    #         return sample_keys
-    #     return tf.one_hot(idxs, self.memory_size)
-
-
-
-
-
-
-
-
-
+        distrib = torch.distributions.Categorical(probs)
+        sampled_idxs = distrib.sample(torch.Size([batch_size]))
+        sample_keys = self.memory_key[sampled_idxs]
+        print(sample_keys.size())
+        return sample_keys
