@@ -1,6 +1,7 @@
 from matplotlib import pyplot as plt
 import numpy as np
 from torchvision import transforms
+import torch
 import time
 
 
@@ -41,3 +42,10 @@ def timer(fun, **kwargs):
     fun(**kwargs)
     end = time.time()
     print('time elapsed: {:.3f}'.format(end - start))
+
+
+def get_grads(model):
+    return [p.grad for p in model.parameters()]
+
+def normalize(matrix):
+    return torch.transpose(torch.transpose(matrix, 1, 0)/matrix.norm(dim=1), 1, 0)

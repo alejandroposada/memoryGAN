@@ -23,13 +23,15 @@ class gan_super(nn.Module):
         self.f_dim = config_vars.f_dim
         self.choose_k = config_vars.choose_k
         self.z_dim = config_vars.z_dim
+        self.alpha = config_vars.alpha
+        self.num_steps = config_vars.num_steps
         self.is_cuda = is_cuda
 
     def discriminate(self, x, label):
-        return self.dmn.forward(x)
+        return self.dmn.forward(x), None
 
     def generate(self, z):
-        return self.mcgn.forward(z)
+        return self.mcgn.forward(z), None
 
     def Dloss(self, true_output, fake_output):
         return -torch.mean(torch.log(true_output)) - torch.mean(torch.log(1 - fake_output))
