@@ -129,7 +129,12 @@ class memory(nn.Module):
 
         #  compute P(c|x, v_c=y) from eq 1 of paper
         p_c_given_x_v = (p_x_given_c_unnorm * p_c_unnorm)
-        _, idxs = torch.topk(p_c_given_x_v, k=self.choose_k)
+        _, unnorm_idxs = torch.topk(p_c_given_x_v, k=self.choose_k)
+        # Need to normalize my indices for the orig memory (not the reduced one)
+        idxs = torch.zeros_like(unnorm_idxs)
+        for i in range(unnorm_idxs.size(0)):
+            idx_map = dict(zip(unnorm_idxs[i].tolist(), indices.tolist()))
+
 
         for i, l in enumerate(idxs):
             if list(indices.size())[0] == 0:  # I don't think this ever happens...
