@@ -9,7 +9,7 @@ import numpy as np
 
 # from project
 from load_utils import load_dataset, create_new_model, load_model
-from save_utils import save_learning_curve_epoch, save_all
+from save_utils import save_learning_curve_epoch, save_all, save_verbose
 from train_utils import train_step
 
 
@@ -50,6 +50,12 @@ def main():
 
     np.random.seed(args.seed)  # reset training seed to ensure that batches remain the same between runs!
 
+    if args.memory and args.verbose:
+        h_per = []
+        k_per = []
+        a_per = []
+        v_per = []
+
     try:
         for epoch in range(prev_epoch, args.n_epochs):
 
@@ -57,9 +63,9 @@ def main():
             gen_losses_epoch = []
             for idx, (true_batch, _) in enumerate(train_loader):
                 disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
-                        = train_step(gan=gan, batch_size=args.batch_size, label_smoothing=args.label_smoothing,
-                                     is_cuda=args.cuda, true_batch=true_batch, grad_clip=args.grad_clip,
-                                     disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer)
+                        = train_step(gan=gan, batch_size=args.batch_size, is_cuda=args.cuda, true_batch=true_batch,
+                                     grad_clip=args.grad_clip, disc_optimizer=disc_optimizer,
+                                     gen_optimizer=gen_optimizer)
 
                 if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                     print('epoch {}: step {}/{} disc true acc: {:.4f} disc fake acc: {:.4f} '
@@ -67,8 +73,22 @@ def main():
                           .format(epoch+1, idx+1, len(train_loader), disc_true_accuracy, disc_fake_accuracy,
                                   disc_train_loss.item(), gen_train_loss.item()))
 
+                if args.memory and args.verbose:
+                    h_per.append(gan.memory.memory_hist)
+                    k_per.append(gan.memory.memory_key)
+                    a_per.append(gan.memory.memory_age)
+                    v_per.append(gan.memory.memory_values)
+
+                    if (total_examples != 0) and (total_examples % args.display_result_every == 0):
+                        print('avg hist: {:.4f} avg age: {:.5f} avg key val: {:.4f}'
+                              .format(h_per[-1].mean(), a_per[-1].mean(), v_per[-1].mean()))
+
+                    if (total_examples != 0) and (total_examples % args.checkpoint_interval == 0):
+                        save_verbose(h_per, k_per, a_per, v_per)
+
                 # Checkpoint model
                 total_examples += args.batch_size
+
                 if (total_examples != 0) and (total_examples % args.checkpoint_interval == 0):
 
                     disc_losses.extend(disc_losses_epoch)
@@ -126,8 +146,8 @@ if __name__ == '__main__':
     argparser.add_argument('--display_result_every', type=int, default=640)   # 640
     argparser.add_argument('--checkpoint_interval', type=int, default=32000)  # 32000
     argparser.add_argument('--seed', type=int, default=1024)
-    argparser.add_argument('--label_smoothing', action='store_true', default=True)
     argparser.add_argument('--memory', action='store_true', default=True)  # use memory?
+    argparser.add_argument('--verbose', action='store_true', default=True)  # save internal memory info?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()
 

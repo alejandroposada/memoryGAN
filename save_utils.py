@@ -116,3 +116,6 @@ def save_all(total_examples, fixed_noise, gan, disc_loss_per_epoch, gen_loss_per
     save_learning_curve(gen_losses=gen_losses, disc_losses=disc_losses, total_examples=total_examples,
                         directory=train_summaries_dir)
     print("Saved learning curves!")
+
+def save_verbose(h_per, k_per, a_per, v_per):
+    pass
