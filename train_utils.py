@@ -1,7 +1,7 @@
 import torch
 
 
-def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, gen_optimizer, memory):
+def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, gen_optimizer, memory, use_EM):
     gan.dmn.zero_grad()
 
     true_target = torch.ones(batch_size)
@@ -33,8 +33,12 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
 
     #  Update memory
     if memory:
-        gan.memory.update_memory(q_real.detach(), true_target.detach())
-        gan.memory.update_memory(q_fake.detach(), fake_target.detach())
+        if use_EM:
+            gan.memory.Roger_update_memory(q_real.detach(), true_target.detach())
+            gan.memory.Roger_update_memory(q_fake.detach(), fake_target.detach())
+        else:
+            gan.memory.update_memory_noEM(q_real.detach(), true_target.detach())
+            gan.memory.update_memory_noEM(q_fake.detach(), fake_target.detach())
 
     torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
     disc_optimizer.step()  # set for discriminator only

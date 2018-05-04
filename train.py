@@ -34,8 +34,7 @@ def main():
         print('creating new model...')
         total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, disc_loss_per_epoch, \
         prev_epoch, gan, disc_optimizer, gen_optimizer \
-            = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0, args.beta_1,
-                               args.memory, args.use_EM)
+            = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0, args.beta_1, args.memory)
 
     # results save folder
     gen_images_dir = 'results/generated_images'
@@ -67,7 +66,7 @@ def main():
                 disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
                         = train_step(gan=gan, batch_size=args.batch_size, is_cuda=args.cuda, true_batch=true_batch,
                                      grad_clip=args.grad_clip, disc_optimizer=disc_optimizer,
-                                     gen_optimizer=gen_optimizer, memory=args.memory)
+                                     gen_optimizer=gen_optimizer, memory=args.memory, use_EM=args.use_EM)
 
                 if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                     print('epoch {}: step {}/{} disc true acc: {:.4f} disc fake acc: {:.4f} '
