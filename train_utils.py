@@ -1,8 +1,7 @@
 import torch
-from helpers import timer
 
-def train_step(gan, batch_size, is_cuda, true_batch,
-               grad_clip, disc_optimizer, gen_optimizer):
+
+def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, gen_optimizer):
     gan.dmn.zero_grad()
 
     true_target = torch.ones(batch_size)
@@ -14,10 +13,6 @@ def train_step(gan, batch_size, is_cuda, true_batch,
 
     # train discriminator on true data
     true_disc_result = gan.discriminate(true_batch, true_target)
-
-    #disc_train_loss_true = loss(true_disc_result.squeeze(), true_target)
-    #disc_train_loss_true.backward()
-    #torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
     fake_target = torch.zeros(batch_size)
@@ -37,14 +32,6 @@ def train_step(gan, batch_size, is_cuda, true_batch,
     disc_train_loss.backward()
     torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
     disc_optimizer.step()  # set for discriminator only
-
-    # disc_train_loss_false = loss(fake_disc_result.squeeze(), fake_target)
-    # disc_train_loss_false.backward()
-    # torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
-    # disc_optimizer.step()  # set for discriminator only
-
-    #  compute performance statistics
-    # disc_train_loss = disc_train_loss_true + disc_train_loss_false
 
     disc_fake_accuracy = 1 - torch.sum(fake_disc_result > 0.5).item() / batch_size
     disc_true_accuracy = torch.sum(true_disc_result > 0.5).item() / batch_size
