@@ -5,6 +5,7 @@ from models.memory_gan.mcgn import mcgn
 from models.memory_gan.dmn import dmn
 from models.memory_gan.memory import memory
 from models.gan_super import gan_super
+from helpers import normalize
 
 class GAN(gan_super):
     """GAN
@@ -17,20 +18,21 @@ class GAN(gan_super):
         self.dmn = dmn(f_dim=self.f_dim, fc_dim=self.fc_dim, key_dim=self.key_dim)
         self.mcgn = mcgn(f_dim=self.f_dim, fc_dim=self.fc_dim, z_dim=self.z_dim,
                          c_dim=self.c_dim, key_dim=self.key_dim)
-        self.memory = memory(key_dim=self.key_dim, memory_size=self.mem_size, choose_k=self.choose_k, is_cuda=is_cuda)
+        self.memory = memory(key_dim=self.key_dim, memory_size=self.mem_size, choose_k=self.choose_k,
+                             is_cuda=is_cuda, alpha=self.alpha, num_steps=self.num_steps)
         self.use_EM = use_EM
 
     def discriminate(self, x, label):
         q = self.dmn.forward(x)  # get query vec
-        qn = torch.norm(q, p=2, dim=1).detach()  # l2 normalize
-        qn2 = q.div(torch.transpose(qn.expand(q.size(1), q.size(0)), 1, 0))
-        self.q = qn2
-        post_prob = self.memory.query(qn2)
+        qn = normalize(q)
+        self.q = qn
+        post_prob = self.memory.query(qn)
         if self.use_EM:
             self.memory.Roger_update_memory(qn2, label)
         else:
             self.memory.update_memory_noEM(qn2, label)
-        return post_prob
+        return post_prob, qn
+
 
     def generate(self, z):
         if self.is_cuda:

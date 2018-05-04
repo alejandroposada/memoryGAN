@@ -67,7 +67,7 @@ def main():
                 disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
                         = train_step(gan=gan, batch_size=args.batch_size, is_cuda=args.cuda, true_batch=true_batch,
                                      grad_clip=args.grad_clip, disc_optimizer=disc_optimizer,
-                                     gen_optimizer=gen_optimizer)
+                                     gen_optimizer=gen_optimizer, memory=args.memory)
 
                 if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                     print('epoch {}: step {}/{} disc true acc: {:.4f} disc fake acc: {:.4f} '

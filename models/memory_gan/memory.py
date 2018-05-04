@@ -1,11 +1,11 @@
 import torch.nn as nn
-import torch.nn.functional as F
 import torch
+from helpers import normalize
 
 
 class memory(nn.Module):
     """DISCRIMINATIVE MEMORY NETWORK """
-    def __init__(self, key_dim, memory_size, choose_k, is_cuda):
+    def __init__(self, key_dim, memory_size, choose_k, is_cuda, alpha, num_steps):
         """
         """
         super(memory, self).__init__()
@@ -14,6 +14,8 @@ class memory(nn.Module):
         self.key_dim = key_dim
         self.memory_size = memory_size
         self.choose_k = min(choose_k, self.memory_size)
+        self.alpha = alpha
+        self.num_steps = num_steps
 
         if is_cuda:
             self.memory_key = torch.zeros([self.memory_size, self.key_dim]).cuda()  # K in 3.1 of paper
@@ -29,11 +31,6 @@ class memory(nn.Module):
             self.memory_age = torch.zeros([self.memory_size])                            # a in 3.1 of paper
             self.memory_hist = torch.FloatTensor(size=[self.memory_size])                # h in 3.1 of paper
             self.memory_hist[:] = 1e-5
-
-        #self.memory_key.detach()
-        #self.memory_values.detach()
-        #self.memory_age.detach()
-        #self.memory_hist.detach()
 
     def query(self, q):
         #  compute P(x|c)
@@ -60,7 +57,8 @@ class memory(nn.Module):
         return p_y_given_x
 
     #  EM update of memory, 3.1.2
-    def update_memory(self, q, label, n_steps=1):
+    def update_memory(self, q, label):
+
         #  compute P(x|c, v_c=y)
         similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
         p_x_given_c_unnorm = torch.exp(similarities)
@@ -71,7 +69,7 @@ class memory(nn.Module):
         #  compute P(c|x, v_c=y) from eq 1 of paper
         p_c_given_x = (p_x_given_c_unnorm * p_c)
 
-        p_v_c_eq_y = torch.ger(label, self.memory_values) + torch.ger(1-label, 1-self.memory_values)
+        p_v_c_eq_y = torch.ger(label, self.memory_values).detach() + torch.ger(1-label, 1-self.memory_values)
         p_c_given_x_v = (p_c_given_x*p_v_c_eq_y)
         p_c_given_x_v_approx, idx = torch.topk(p_c_given_x_v, k=self.choose_k)
 
@@ -90,15 +88,14 @@ class memory(nn.Module):
             else:
                 idx_to_change = idx[i, l == 1]
                 gamma = 0
-                alpha = 0.5
-                h_hat = alpha * self.memory_hist[idx_to_change]
-                k_hat = self.memory_key[idx_to_change]
-                for _ in range(n_steps):
+                h_hat = self.alpha * self.memory_hist[idx_to_change].detach()
+                k_hat = self.memory_key[idx_to_change].detach()
+                for _ in range(self.num_steps):
                     #  E Step
                     similarities = torch.matmul(q[i], torch.transpose(k_hat, 1, 0))
-                    p_x_given_c_unnorm = torch.exp(similarities).detach()
+                    p_x_given_c_unnorm = torch.exp(similarities)
                     p_c = ((h_hat + self.beta) / torch.sum(h_hat + self.beta))
-                    p_c_given_x = (p_x_given_c_unnorm * p_c).detach()
+                    p_c_given_x = (p_x_given_c_unnorm * p_c)
                     next_gamma = (p_c_given_x / p_c_given_x.sum(0))
 
                     #  M step
@@ -107,9 +104,12 @@ class memory(nn.Module):
                                              expand(self.key_dim, len(h_hat)), 0, 1)*(q[i] - k_hat)
                     gamma = next_gamma
 
-                k_hat = (k_hat/torch.norm(k_hat, p=2, dim=0))  # l2 normalize
+                k_hat = normalize(k_hat)
+
                 self.memory_key[idx_to_change] = k_hat
                 self.memory_hist[idx_to_change] = h_hat
+                self.memory_age += 1e-5  # testing
+
 
     def update_memory_noEM(self, q, label):
         pass

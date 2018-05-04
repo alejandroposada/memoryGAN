@@ -1,5 +1,6 @@
 class config:
     def __init__(self, dataset):
+
         if dataset == "fashion-mnist" or dataset == "mnist":
             self.y_dim = 10
             self.image_shape = [28, 28, 1]
@@ -11,6 +12,8 @@ class config:
             self.mem_size = 4096
             self.choose_k = 128
             self.key_dim = 256
+            self.num_steps = 1
+            self.alpha = 0.5
 
         elif dataset == "cifar10":
             self.y_dim = 10
@@ -23,3 +26,5 @@ class config:
             self.mem_size = 16384
             self.choose_k = 256
             self.key_dim = 512
+            self.num_steps = 1
+            self.alpha = 0.5
