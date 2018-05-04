@@ -22,10 +22,10 @@ class GAN(gan_super):
     def discriminate(self, x, label):
         q = self.dmn.forward(x)  # get query vec
         qn = torch.norm(q, p=2, dim=1).detach()  # l2 normalize
-        q = q.div(torch.transpose(qn.expand(q.size(1), q.size(0)), 1, 0))
-        self.q = q
-        post_prob = self.memory.query(q)
-        self.memory.update_memory(q, label)
+        qn2 = q.div(torch.transpose(qn.expand(q.size(1), q.size(0)), 1, 0))
+        self.q = qn2
+        post_prob = self.memory.query(qn2)
+        #self.memory.update_memory(qn2, label)
         return post_prob
 
     def generate(self, z):
@@ -46,4 +46,4 @@ class GAN(gan_super):
 
     def Gloss(self, fake_output):
         I_hat = -torch.mean(F.cosine_similarity(self.key, self.q))
-        return torch.mean(1 - torch.log(fake_output)) + self.lamb*I_hat
+        return -torch.mean(torch.log(fake_output)) + self.lamb*I_hat

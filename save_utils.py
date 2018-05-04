@@ -117,5 +117,10 @@ def save_all(total_examples, fixed_noise, gan, disc_loss_per_epoch, gen_loss_per
                         directory=train_summaries_dir)
     print("Saved learning curves!")
 
+
 def save_verbose(h_per, k_per, a_per, v_per):
+    v_per_time = torch.stack(v_per, 0)
+    a_per_time = torch.stack(a_per, 0)
+    k_per_time = torch.stack(k_per, 0)
+    h_per_time = torch.stack(h_per, 0)
     pass
