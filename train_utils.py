@@ -1,7 +1,7 @@
 import torch
 
 
-def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, gen_optimizer):
+def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, gen_optimizer, memory):
     gan.dmn.zero_grad()
 
     true_target = torch.ones(batch_size)
@@ -12,7 +12,7 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
         true_target = true_target.cuda()
 
     # train discriminator on true data
-    true_disc_result = gan.discriminate(true_batch, true_target)
+    true_disc_result, q_real = gan.discriminate(true_batch, true_target)
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
     fake_target = torch.zeros(batch_size)
@@ -25,11 +25,17 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
 
     # train discriminator on fake data
     fake_batch = gan.generate(z)
-    fake_disc_result = gan.discriminate(fake_batch.detach(), fake_target)  # gradients not computed for generator
+    fake_disc_result, q_fake = gan.discriminate(fake_batch.detach(), fake_target)  # gradients not computed for generator
 
     # Calculate Dloss
     disc_train_loss = gan.Dloss(true_disc_result, fake_disc_result)
     disc_train_loss.backward()
+
+    #  Update memory
+    if memory:
+        gan.memory.update_memory(q_real.detach(), true_target.detach())
+        gan.memory.update_memory(q_fake.detach(), fake_target.detach())
+
     torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
     disc_optimizer.step()  # set for discriminator only
 
@@ -50,7 +56,7 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
     fake_batch = gan.generate(z)
 
     #gan.dmn.eval()  # set discriminator to evaluation mode
-    disc_result = gan.discriminate(fake_batch, fake_target)
+    disc_result, _ = gan.discriminate(fake_batch, fake_target)
     # gen_train_loss = loss(disc_result.squeeze(), true_target)
     gen_train_loss = gan.Gloss(disc_result)
 
