@@ -28,9 +28,9 @@ class GAN(gan_super):
         self.q = qn
         post_prob = self.memory.query(qn)
         if self.use_EM:
-            self.memory.Roger_update_memory(qn2, label)
+            self.memory.Roger_update_memory(qn, label)
         else:
-            self.memory.update_memory_noEM(qn2, label)
+            self.memory.update_memory_noEM(qn, label)
         return post_prob, qn
 
 
