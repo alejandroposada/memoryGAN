@@ -19,9 +19,9 @@ def train_step(gan, batch_size, label_smoothing, is_cuda, true_batch,
     # train discriminator on true data
     true_disc_result = gan.discriminate(true_batch, true_target)
 
-    # disc_train_loss_true = loss(true_disc_result.squeeze(), true_target)
-    # disc_train_loss_true.backward()
-    # torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
+    #disc_train_loss_true = loss(true_disc_result.squeeze(), true_target)
+    #disc_train_loss_true.backward()
+    #torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
     if label_smoothing:
@@ -36,7 +36,7 @@ def train_step(gan, batch_size, label_smoothing, is_cuda, true_batch,
         z = torch.randn(batch_size, gan.z_dim)
 
     # train discriminator on fake data
-    fake_batch = gan.generate(z, batch_size)
+    fake_batch = gan.generate(z)
     fake_disc_result = gan.discriminate(fake_batch.detach(), fake_target)  # gradients not computed for generator
 
     # Calculate Dloss
@@ -58,20 +58,22 @@ def train_step(gan, batch_size, label_smoothing, is_cuda, true_batch,
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
     if label_smoothing:
-        true_target = torch.FloatTensor(batch_size).uniform_(0.7, 1.2)
+        fake_target = torch.FloatTensor(batch_size).uniform_(0.7, 1.2)
     else:
-        true_target = torch.ones(batch_size)
+        fake_target = torch.ones(batch_size)
 
     if is_cuda:
         z = torch.randn(batch_size, gan.mcgn.z_dim).cuda()
-        true_target = true_target.cuda()
+        fake_target = fake_target.cuda()
     else:
         z = torch.randn(batch_size, gan.mcgn.z_dim)
 
     # train generator
     gan.mcgn.zero_grad()
-    fake_batch = gan.generate(z, batch_size)
-    disc_result = gan.discriminate(fake_batch, true_target)
+    fake_batch = gan.generate(z)
+
+    gan.dmn.eval()  # set discriminator to evaluation mode
+    disc_result = gan.discriminate(fake_batch, fake_target)
     # gen_train_loss = loss(disc_result.squeeze(), true_target)
     gen_train_loss = gan.Gloss(disc_result)
 

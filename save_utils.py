@@ -108,7 +108,7 @@ def save_all(total_examples, fixed_noise, gan, disc_loss_per_epoch, gen_loss_per
     print("Checkpoint saved!")
 
     # sample images for inspection
-    save_image_sample(batch=gan.generate(fixed_noise, batch_size=fixed_noise.size(0)),
+    save_image_sample(batch=gan.generate(fixed_noise),
                       is_cuda=is_cuda, total_examples=total_examples, directory=gen_images_dir, dataset=train_set)
     print("Saved images!")
 
