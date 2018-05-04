@@ -1,15 +1,11 @@
 import torch
 from helpers import timer
 
-def train_step(gan, batch_size, label_smoothing, is_cuda, true_batch,
+def train_step(gan, batch_size, is_cuda, true_batch,
                grad_clip, disc_optimizer, gen_optimizer):
     gan.dmn.zero_grad()
 
-    #  hack 6 of https://github.com/soumith/ganhacks
-    if label_smoothing:
-        true_target = torch.FloatTensor(batch_size).uniform_(0.7, 1.2)
-    else:
-        true_target = torch.ones(batch_size)
+    true_target = torch.ones(batch_size)
 
     # Sample  minibatch  of examples from data generating distribution
     if is_cuda:
@@ -24,10 +20,7 @@ def train_step(gan, batch_size, label_smoothing, is_cuda, true_batch,
     #torch.nn.utils.clip_grad_norm_(gan.dmn.parameters(), grad_clip)
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
-    if label_smoothing:
-        fake_target = torch.FloatTensor(batch_size).uniform_(0, 0.3)
-    else:
-        fake_target = torch.zeros(batch_size)
+    fake_target = torch.zeros(batch_size)
 
     if is_cuda:
         z = torch.randn(batch_size, gan.z_dim).cuda()
@@ -57,10 +50,7 @@ def train_step(gan, batch_size, label_smoothing, is_cuda, true_batch,
     disc_true_accuracy = torch.sum(true_disc_result > 0.5).item() / batch_size
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
-    if label_smoothing:
-        fake_target = torch.FloatTensor(batch_size).uniform_(0.7, 1.2)
-    else:
-        fake_target = torch.ones(batch_size)
+    fake_target = torch.ones(batch_size)
 
     if is_cuda:
         z = torch.randn(batch_size, gan.z_dim).cuda()

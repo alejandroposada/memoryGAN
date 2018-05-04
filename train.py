@@ -57,7 +57,7 @@ def main():
             gen_losses_epoch = []
             for idx, (true_batch, _) in enumerate(train_loader):
                 disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
-                        = train_step(gan=gan, batch_size=args.batch_size, label_smoothing=args.label_smoothing,
+                        = train_step(gan=gan, batch_size=args.batch_size,
                                      is_cuda=args.cuda, true_batch=true_batch, grad_clip=args.grad_clip,
                                      disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer)
 
@@ -126,8 +126,7 @@ if __name__ == '__main__':
     argparser.add_argument('--display_result_every', type=int, default=640)   # 640
     argparser.add_argument('--checkpoint_interval', type=int, default=32000)  # 32000
     argparser.add_argument('--seed', type=int, default=1024)
-    argparser.add_argument('--label_smoothing', action='store_true', default=True)
-    argparser.add_argument('--memory', action='store_true', default=True)  # use memory?
+    argparser.add_argument('--memory', action='store_true', default=False)  # use memory?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()
 
