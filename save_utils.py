@@ -9,32 +9,37 @@ import warnings
 warnings.filterwarnings("ignore")
 matplotlib.use('Agg')
 
-def save_image_sample(dataset, batch, cuda, total_examples, directory):
+def save_image_sample(dataset, batch, is_cuda, total_examples, directory):
 
-    if dataset == 'cifar10': # I dont think this works with b&w...
-        invTrans = transforms.Compose([transforms.Normalize(mean=[0., 0., 0.],
-                                                            std=[1 / 0.5, 1 / 0.5, 1 / 0.5]),
-                                       transforms.Normalize(mean=[-0.5, -0.5, -0.5],
-                                                            std=[1., 1., 1.]),
-                                       transforms.ToPILImage()
-                                       ])
+    invTrans = transforms.Compose([transforms.Normalize(mean=[0., 0., 0.],
+                                                        std=[1 / 0.5, 1 / 0.5, 1 / 0.5]),
+                                   transforms.Normalize(mean=[-0.5, -0.5, -0.5],
+                                                        std=[1., 1., 1.]),
+                                   transforms.ToPILImage()
+                                   ])
 
-        f, axarr = plt.subplots(nrows=int(np.sqrt(len(batch))), ncols=int(np.sqrt(len(batch))))
-        indx = 0
-        for i in range(int(np.sqrt(len(batch)))):
-            for j in range(int(np.sqrt(len(batch)))):
-                if cuda:
-                    axarr[i, j].imshow(invTrans(batch[indx].data.cpu()))
-                    indx += 1
-                else:
+    f, axarr = plt.subplots(nrows=int(np.sqrt(len(batch))), ncols=int(np.sqrt(len(batch))))
+    indx = 0
+    for i in range(int(np.sqrt(len(batch)))):
+        for j in range(int(np.sqrt(len(batch)))):
+            if is_cuda:
+                if dataset == 'cifar10':
+                    axarr[i, j].imshow(invTrans(batch[indx].cpu()))
+                else:  # b&w
+                    axarr[i, j].imshow(np.asarray(invTrans(batch[indx].cpu())), cmap='gray')
+                indx += 1
+            else:
+                if dataset == 'cifar10':
                     axarr[i, j].imshow(invTrans(batch[indx]))
-                    indx += 1
+                else:  # b&w
+                    axarr[i, j].imshow(np.asarray(invTrans(batch[indx])), cmap='gray')
+                indx += 1
 
-                # Turn off tick labels
-                axarr[i, j].axis('off')
+            # Turn off tick labels
+            axarr[i, j].axis('off')
 
-        f.tight_layout()
-        f.savefig(directory+'/gen_images_after_{}_examples'.format(total_examples))
+    f.tight_layout()
+    f.savefig(directory+'/gen_images_after_{}_examples'.format(total_examples))
 
 
 def save_checkpoint(total_examples, gan, gen_losses, disc_losses, disc_loss_per_epoch, gen_loss_per_epoch,
@@ -91,7 +96,7 @@ def save_learning_curve_epoch(gen_losses, disc_losses, total_epochs, directory):
 
 
 def save_all(total_examples, fixed_noise, gan, disc_loss_per_epoch, gen_loss_per_epoch, gen_losses,
-             disc_losses, epoch, checkpoint_dir, cuda, gen_images_dir, train_summaries_dir,
+             disc_losses, epoch, checkpoint_dir, is_cuda, gen_images_dir, train_summaries_dir,
              disc_optimizer, gen_optimizer, train_set, memory):
 
     save_checkpoint(total_examples=total_examples, fixed_noise=fixed_noise, gan=gan,
@@ -103,11 +108,14 @@ def save_all(total_examples, fixed_noise, gan, disc_loss_per_epoch, gen_loss_per
     print("Checkpoint saved!")
 
     # sample images for inspection
-    save_image_sample(batch=gan.generate(fixed_noise, batch_size=fixed_noise.size(0)),
-                      cuda=cuda, total_examples=total_examples, directory=gen_images_dir, dataset=train_set)
+    save_image_sample(batch=gan.generate(fixed_noise),
+                      is_cuda=is_cuda, total_examples=total_examples, directory=gen_images_dir, dataset=train_set)
     print("Saved images!")
 
     # save learning curves for inspection
     save_learning_curve(gen_losses=gen_losses, disc_losses=disc_losses, total_examples=total_examples,
                         directory=train_summaries_dir)
     print("Saved learning curves!")
+
+def save_verbose(h_per, k_per, a_per, v_per):
+    pass
