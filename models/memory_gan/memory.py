@@ -69,7 +69,7 @@ class memory(nn.Module):
         #  compute P(c|x, v_c=y) from eq 1 of paper
         p_c_given_x = (p_x_given_c_unnorm * p_c)
 
-        p_v_c_eq_y = torch.ger(label, self.memory_values).detach() + torch.ger(1-label, 1-self.memory_values)
+        p_v_c_eq_y = torch.ger(label, self.memory_values) + torch.ger(1-label, 1-self.memory_values)
         p_c_given_x_v = (p_c_given_x*p_v_c_eq_y)
         p_c_given_x_v_approx, idx = torch.topk(p_c_given_x_v, k=self.choose_k)
 
@@ -88,8 +88,8 @@ class memory(nn.Module):
             else:
                 idx_to_change = idx[i, l == 1]
                 gamma = 0
-                h_hat = self.alpha * self.memory_hist[idx_to_change].detach()
-                k_hat = self.memory_key[idx_to_change].detach()
+                h_hat = self.alpha * self.memory_hist[idx_to_change]
+                k_hat = self.memory_key[idx_to_change]
                 for _ in range(self.num_steps):
                     #  E Step
                     similarities = torch.matmul(q[i], torch.transpose(k_hat, 1, 0))
@@ -112,7 +112,19 @@ class memory(nn.Module):
 
 
     def update_memory_noEM(self, q, label):
-        pass
+        # compute similarity between batch of q and my mem_keys
+        similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
+        nearest_neighbours, idx = torch.topk(similarities, k=1)
+        for i in idx:
+            if self.memory_values[i] == label[i]:
+                self.memory_key[i] = (q[i] + self.memory_key[i])/(q[i] + self.memory_key[i]).norm(2)
+                self.memory_age += 1
+                self.memory_age[i] = 0
+            else:
+                oldest_idx = torch.argmax(self.memory_age)
+                self.memory_key[oldest_idx] = q[i]
+                self.memory_key[oldest_idx] = 0
+                self.memory_values[oldest_idx] = label[i]
 
     def Roger_update_memory(self, q, label, n_steps=1):
         # Goal: compute P(x|c, v_c=y)
