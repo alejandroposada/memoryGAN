@@ -35,9 +35,6 @@ def main():
         prev_epoch, gan, disc_optimizer, gen_optimizer \
             = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0, args.beta_1, args.memory)
 
-    # Binary Cross Entropy loss
-    BCE_loss = nn.BCEWithLogitsLoss()  # ROGER: Why with Logits?
-
     # results save folder
     gen_images_dir = 'results/generated_images'
     train_summaries_dir = 'results/training_summaries'
@@ -61,8 +58,8 @@ def main():
             for idx, (true_batch, _) in enumerate(train_loader):
                 disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
                         = train_step(gan=gan, batch_size=args.batch_size, label_smoothing=args.label_smoothing,
-                                     cuda=args.cuda, true_batch=true_batch, loss=BCE_loss, grad_clip=args.grad_clip,
-                                     disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer, memory=args.memory)
+                                     is_cuda=args.cuda, true_batch=true_batch, grad_clip=args.grad_clip,
+                                     disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer)
 
                 if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                     print('epoch {}: step {}/{} disc true acc: {:.4f} disc fake acc: {:.4f} '
@@ -79,7 +76,7 @@ def main():
                     save_all(total_examples=total_examples, fixed_noise=fixed_noise, gan=gan,
                              disc_loss_per_epoch=disc_loss_per_epoch, gen_loss_per_epoch=gen_loss_per_epoch,
                              gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch,
-                             checkpoint_dir=checkpoint_dir, cuda=args.cuda,
+                             checkpoint_dir=checkpoint_dir, is_cuda=args.cuda,
                              gen_images_dir=gen_images_dir, train_summaries_dir=train_summaries_dir,
                              disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer,
                              train_set=args.train_set, memory=args.memory)
@@ -107,7 +104,7 @@ def main():
         save_all(total_examples=total_examples, fixed_noise=fixed_noise, gan=gan,
                  disc_loss_per_epoch=disc_loss_per_epoch, gen_loss_per_epoch=gen_loss_per_epoch,
                  gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch,
-                 checkpoint_dir=checkpoint_dir, cuda=args.cuda, gen_images_dir=gen_images_dir,
+                 checkpoint_dir=checkpoint_dir, is_cuda=args.cuda, gen_images_dir=gen_images_dir,
                  train_summaries_dir=train_summaries_dir, disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer,
                  train_set=args.train_set, memory=args.memory)
 
@@ -129,7 +126,7 @@ if __name__ == '__main__':
     argparser.add_argument('--display_result_every', type=int, default=640)   # 640
     argparser.add_argument('--checkpoint_interval', type=int, default=32000)  # 32000
     argparser.add_argument('--seed', type=int, default=1024)
-    argparser.add_argument('--label_smoothing', action='store_true', default=False)
+    argparser.add_argument('--label_smoothing', action='store_true', default=True)
     argparser.add_argument('--memory', action='store_true', default=True)  # use memory?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()

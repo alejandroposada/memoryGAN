@@ -5,7 +5,7 @@ import torch
 
 class memory(nn.Module):
     """DISCRIMINATIVE MEMORY NETWORK """
-    def __init__(self, key_dim, memory_size, choose_k, cuda):
+    def __init__(self, key_dim, memory_size, choose_k, is_cuda):
         """
         """
         super(memory, self).__init__()
@@ -15,7 +15,7 @@ class memory(nn.Module):
         self.memory_size = memory_size
         self.choose_k = min(choose_k, self.memory_size)
 
-        if cuda:
+        if is_cuda:
             self.memory_key = torch.zeros([self.memory_size, self.key_dim]).cuda()  # K in 3.1 of paper
             self.memory_values = torch.ones([self.memory_size]).cuda()
             self.memory_values[self.memory_size // 2:] = 0                          # v in 3.1 of paper
@@ -112,5 +112,4 @@ class memory(nn.Module):
         distrib = torch.distributions.Categorical(probs)
         sampled_idxs = distrib.sample(torch.Size([batch_size]))
         sample_keys = self.memory_key[sampled_idxs]
-        print(sample_keys.size())
         return sample_keys

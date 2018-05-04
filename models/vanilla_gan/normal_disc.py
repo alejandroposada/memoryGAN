@@ -25,4 +25,4 @@ class disc(nn.Module):
         h = h.view(h.size(0), -1)
         h = F.leaky_relu(self.fc1(h), 0.2)
         y = self.fc2(h)
-        return y
+        return F.sigmoid(y)

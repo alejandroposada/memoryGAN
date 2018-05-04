@@ -28,4 +28,4 @@ class gen(nn.Module):
         x_new = x_new.view(h.shape[0], self.f_dim * 2, 5, 5)
         x_new = F.leaky_relu(self.conv1(x_new, output_size=[13, 13]), 0.2)
         x_new = F.leaky_relu(self.conv2(x_new, output_size=[28, 28]), 0.2)
-        return F.sigmoid(x_new)
+        return F.tanh(x_new)
