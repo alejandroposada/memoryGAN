@@ -2,7 +2,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-
 class memory(nn.Module):
     """DISCRIMINATIVE MEMORY NETWORK """
     def __init__(self, key_dim, memory_size, choose_k, is_cuda):
@@ -77,11 +76,11 @@ class memory(nn.Module):
         for i, l in enumerate(s_with_correct_label):
             if not l.any():
                 #  find oldest memory slot and copy information onto it
-                oldest_idx = torch.argmax(self.memory_age)
-                self.memory_key[oldest_idx] = q[i]
-                self.memory_hist[oldest_idx] = self.memory_hist.mean()
+                oldest_idx = torch.argmax(self.memory_age).detach()
+                self.memory_key[oldest_idx] = q[i].detach()
+                self.memory_hist[oldest_idx] = self.memory_hist.mean().detach()
                 self.memory_age[oldest_idx] = 0
-                self.memory_values[oldest_idx] = label[i]
+                self.memory_values[oldest_idx] = label[i].detach()
             else:
                 idx_to_change = idx[i, l == 1]
                 gamma = 0
