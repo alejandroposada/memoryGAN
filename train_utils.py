@@ -1,5 +1,5 @@
 import torch
-
+from helpers import timer
 
 def train_step(gan, batch_size, label_smoothing, is_cuda, true_batch,
                grad_clip, disc_optimizer, gen_optimizer):
@@ -63,16 +63,16 @@ def train_step(gan, batch_size, label_smoothing, is_cuda, true_batch,
         fake_target = torch.ones(batch_size)
 
     if is_cuda:
-        z = torch.randn(batch_size, gan.mcgn.z_dim).cuda()
+        z = torch.randn(batch_size, gan.z_dim).cuda()
         fake_target = fake_target.cuda()
     else:
-        z = torch.randn(batch_size, gan.mcgn.z_dim)
+        z = torch.randn(batch_size, gan.z_dim)
 
     # train generator
     gan.mcgn.zero_grad()
     fake_batch = gan.generate(z)
 
-    gan.dmn.eval()  # set discriminator to evaluation mode
+    #gan.dmn.eval()  # set discriminator to evaluation mode
     disc_result = gan.discriminate(fake_batch, fake_target)
     # gen_train_loss = loss(disc_result.squeeze(), true_target)
     gen_train_loss = gan.Gloss(disc_result)

@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from models.memory_gan.mcgn import mcgn
 from models.memory_gan.dmn import dmn
 from models.memory_gan.memory import memory
-
 from models.gan_super import gan_super
 
 class GAN(gan_super):
@@ -27,7 +26,6 @@ class GAN(gan_super):
         self.q = q
         post_prob = self.memory.query(q)
         self.memory.update_memory(q, label)
-
         return post_prob
 
     def generate(self, z):
@@ -48,4 +46,4 @@ class GAN(gan_super):
 
     def Gloss(self, fake_output):
         I_hat = -torch.mean(F.cosine_similarity(self.key, self.q))
-        return - torch.mean(torch.log(fake_output)) + self.lamb*I_hat
+        return torch.mean(1 - torch.log(fake_output)) + self.lamb*I_hat

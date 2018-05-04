@@ -1,8 +1,7 @@
 from matplotlib import pyplot as plt
 import numpy as np
 from torchvision import transforms
-
-from load_utils import load_model
+import time
 
 
 def show_image(images, dataset, is_cuda):
@@ -35,3 +34,10 @@ def show_image(images, dataset, is_cuda):
             axarr[i, j].axis('off')
 
     f.tight_layout()
+
+
+def timer(fun, **kwargs):
+    start = time.time()
+    fun(**kwargs)
+    end = time.time()
+    print('time elapsed: {:.3f}'.format(end - start))
