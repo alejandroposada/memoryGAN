@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 
 from models.config import config
 from models.vanilla_gan.normal_disc import disc
@@ -31,3 +32,9 @@ class GAN(nn.Module):
 
     def generate(self, z, batch_size):
         return self.mcgn.forward(z)
+
+    def Dloss(self, true_output, fake_output):
+        return -torch.mean(torch.log(true_output)) - torch.mean(torch.log(1 - fake_output))
+
+    def Gloss(self, fake_output):
+        return - torch.mean(torch.log(fake_output))
