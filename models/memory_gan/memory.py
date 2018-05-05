@@ -56,7 +56,7 @@ class memory(nn.Module):
         gather memory_keys, values, hists from k_idxs
         '''
         result, joint_, vals, = self.get_result(q)
-        # reset_mask = get_reset_mask(label, joint_, vals_)
+        reset_mask = self.get_reset_mask(label, vals)
         k_idxs = self.obtain_topk(q, label=label)
         # EM - MATT
 
@@ -106,14 +106,17 @@ class memory(nn.Module):
         _, k_idxs = torch.topk(p_c_given_x_est, k=self.choose_k)
         return k_idxs
 
-    def get_reset_mask(self):
+    def get_reset_mask(self, label, val):
         '''get index of nearest correct answer, check if it is
-        1) teacher_hints = |label-self.memory_values| broadcasted to 64x128
+        1) teacher_hints = |label-val| broadcasted to 64x128
         2) teacher_hints = 1 - min(1, teacher_hints)
         3) take top teacher hint per (top_hints has dim 64)
         4) reset_mask == top_hints == 0 (64)
         '''
-        pass
+        teacher_hints = 1.0 - torch.abs(label.unsqueeze(1).repeat(1, val.size(1)) - val)  # 64x128
+        sliced_hints = teacher_hints[:, 0]
+        reset_mask = torch.eq(torch.zeros_like(sliced_hints), sliced_hints)
+        return reset_mask  # 64
 
 
 """
