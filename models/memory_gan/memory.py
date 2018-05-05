@@ -110,7 +110,6 @@ class memory(nn.Module):
                 self.memory_hist[idx_to_change] = h_hat
                 self.memory_age += 1e-5  # testing
 
-
     def update_memory_noEM(self, q, label):
         # compute similarity between batch of q and my mem_keys
         similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
@@ -142,11 +141,10 @@ class memory(nn.Module):
         #  compute P(c|x, v_c=y) from eq 1 of paper
         p_c_given_x_v = (p_x_given_c_unnorm * p_c_unnorm)
         _, unnorm_idxs = torch.topk(p_c_given_x_v, k=self.choose_k)
-        # Need to normalize my indices for the orig memory (not the reduced one)
-        idxs = torch.zeros_like(unnorm_idxs)
-        for i in range(unnorm_idxs.size(0)):
-            idx_map = dict(zip(unnorm_idxs[i].tolist(), indices.tolist()))
-
+        idxs = unnorm_idxs
+        for i in range(idxs.size(0)):
+            for j in range(idxs.size(1)):
+                idxs[i, j] = indices[unnorm_idxs[i, j]].tolist()
 
         for i, l in enumerate(idxs):
             if list(indices.size())[0] == 0:  # I don't think this ever happens...
@@ -160,7 +158,7 @@ class memory(nn.Module):
                 gamma = 0
                 alpha = 0.5
                 h_hat = alpha * self.memory_hist[idxs[i]]
-                k_hat = reduced_memory[idxs[i]]
+                k_hat = self.memory_key[idxs[i]]
                 for _ in range(n_steps):
                     #  E Step
                     similarities = torch.matmul(q[i], torch.t(k_hat))
