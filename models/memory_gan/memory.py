@@ -5,6 +5,7 @@ from helpers import normalize
 
 class memory(nn.Module):
     """DISCRIMINATIVE MEMORY NETWORK """
+
     def __init__(self, key_dim, memory_size, choose_k, is_cuda, alpha, num_steps):
         """
         """
@@ -32,6 +33,67 @@ class memory(nn.Module):
             self.memory_hist = torch.FloatTensor(size=[self.memory_size])                # h in 3.1 of paper
             self.memory_hist[:] = 1e-5
 
+    def sample_key(self, batch_size):
+        real_hist = self.memory_hist * self.memory_values
+        probs = real_hist / real_hist.sum(0)
+        distrib = torch.distributions.Categorical(probs)
+        sampled_idxs = distrib.sample(torch.Size([batch_size]))
+        sample_keys = self.memory_key[sampled_idxs]
+        return sample_keys
+
+    def query(self, q):
+        pass
+
+    def update_memory(self, q):
+        '''
+        result, joint_, vals_ = self.get_result(q, alpha)
+        reset_mask = self.get_reset_mask(label, joint_, vals_)
+
+        k_idxs = self.get_hint_pool_idxs(q, label=label)
+
+        # Usual EM update
+        gather memory_keys, values, hists from k_idxs
+        '''
+        pass
+
+    def get_hint(self, q, label=None):
+        '''compute top k matching indices over FULL keys
+        input q, label
+        1) compute similarity between q and K, get something of dim 64x4096 (batch size=64)
+        2) if label != None, sim = sim - 2*is_wrong, where is_wrong = |label-self.memory_values| broadcasted to 64x4096
+        3) likelihood = exp(sim - 1), prior = self.memory_hist + beta
+        4) top_k = topk(prior*likelihood) (keep top k=128 indices)
+        5) return the indices 64x128
+        '''
+        pass
+
+    def get_result(self, q):
+        '''compute posterior conditioned over top_k keys from before
+        input q
+        1) get top_k from get_hint(q)
+        2) gather vals, keys, hist of these indices
+        3) compute sim using only these keys
+        4) compute likelihood = exp(sim - 1), prior, joint = likelihood*prior
+        5) post = joint / joint.sum(axis=1) (would be size 64 but keep_dims so 64x128)
+        6) result = (post*vals).sum(axis=1) (this time its 64)
+        7) return result (64), joint (64x128), vals (64, 128)
+        '''
+
+    def get_reset_mask(self):
+        '''get index of nearest correct answer, check if it is
+        1) teacher_hints = |label-self.memory_values| broadcasted to 64x128
+        2) teacher_hints = 1 - min(1, teacher_hints)
+        3) take top teacher hint per (top_hints has dim 64)
+        4) reset_mask == top_hints == 0 (64)
+        '''
+        pass
+
+
+
+
+
+"""
+OLD CODE FOR REFERENCE
     def query(self, q):
         #  compute P(x|c)
         similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
@@ -174,11 +236,4 @@ class memory(nn.Module):
                 self.memory_key[idxs[i]] = k_hat
                 self.memory_hist[idxs[i]] = h_hat
         self.memory_age[:] += 1  # I guess...
-
-    def sample_key(self, batch_size):
-        real_hist = self.memory_hist * self.memory_values
-        probs = real_hist / real_hist.sum(0)
-        distrib = torch.distributions.Categorical(probs)
-        sampled_idxs = distrib.sample(torch.Size([batch_size]))
-        sample_keys = self.memory_key[sampled_idxs]
-        return sample_keys
+"""
