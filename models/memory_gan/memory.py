@@ -42,9 +42,10 @@ class memory(nn.Module):
         return sample_keys
 
     def query(self, q):
-        pass
+        result, _, __ = self.get_result(q)
+        return result
 
-    def update_memory(self, q):
+    def update_memory(self, q, label):
         '''
         result, joint_, vals_ = self.get_result(q, alpha)
         reset_mask = self.get_reset_mask(label, joint_, vals_)
@@ -54,20 +55,12 @@ class memory(nn.Module):
         # Usual EM update
         gather memory_keys, values, hists from k_idxs
         '''
-        pass
+        result, joint_, vals, = self.get_result(q)
+        # reset_mask = get_reset_mask(label, joint_, vals_)
+        k_idxs = self.obtain_topk(q, label=label)
+        # EM - MATT
 
-    def get_hint(self, q, label=None):
-        '''compute top k matching indices over FULL keys
-        input q, label
-        1) compute similarity between q and K, get something of dim 64x4096 (batch size=64)
-        2) if label != None, sim = sim - 2*is_wrong, where is_wrong = |label-self.memory_values| broadcasted to 64x4096
-        3) likelihood = exp(sim - 1), prior = self.memory_hist + beta
-        4) top_k = topk(prior*likelihood) (keep top k=128 indices)
-        5) return the indices 64x128
-        '''
-        pass
-
-    def get_result(self, q):
+    def get_result(self, q, alpha=0.5):
         '''compute posterior conditioned over top_k keys from before
         input q
         1) get top_k from get_hint(q)
@@ -78,6 +71,40 @@ class memory(nn.Module):
         6) result = (post*vals).sum(axis=1) (this time its 64)
         7) return result (64), joint (64x128), vals (64, 128)
         '''
+        k_idxs = self.obtain_topk(q)
+        red_mem_keys = self.memory_key[k_idxs]  # 64x128x256
+        red_mem_hist = self.memory_hist[k_idxs] * alpha  # 64x128, mul by alpha for some reason
+        red_mem_vals = self.memory_values[k_idxs]  # 64x128
+        # Please check the following matmul: 64x128x256 * 64x256 --> 64x128
+        similarities = torch.matmul(q.view(q.size(0), 1, self.key_dim),
+                                    torch.transpose(red_mem_keys, 1, 2)).squeeze(1)  # 64x128
+        likelihood = torch.exp(similarities - 1.)  # 64x128
+        prior = red_mem_hist + self.beta  # 64x128
+        joint = likelihood * prior  # 64x128
+        posterior = torch.div(joint, joint.sum(1).view(q.size(0), 1))  # 64x128
+        result = (posterior * red_mem_vals).sum(1)
+        return result, joint, red_mem_vals
+
+    def obtain_topk(self, q, label=None):
+        '''compute top k matching indices over FULL keys
+        input q, label
+        1) compute similarity between q and K, get something of dim 64x4096 (batch size=64)
+        2) if label != None, sim = sim - 2*is_wrong, where is_wrong = |label-self.memory_values| broadcasted to 64x4096
+        3) likelihood = exp(sim - 1), prior = self.memory_hist + beta
+        4) top_k = topk(prior*likelihood) (keep top k=128 indices)
+        5) return the indices 64x128
+        '''
+        similarities = torch.matmul(q, torch.t(self.memory_key))  # size= 64x4096
+        if label != None:
+            is_wrong = torch.abs(label.unsqueeze(1).repeat(1, self.memory_size) -
+                                 self.memory_values.unsqueeze(0).repeat(q.size(0), 1))  # 64x4096
+            # ignored the minimum statement since it looks like it doesn't really do anything.
+            similarities = similarities - 2 * is_wrong
+        likelihood = torch.exp(similarities - 1.)  # 64x4096
+        prior = self.memory_hist.unsqueeze(0).repeat(q.size(0), 1) + self.beta
+        p_c_given_x_est = likelihood * prior
+        _, k_idxs = torch.topk(p_c_given_x_est, k=self.choose_k)
+        return k_idxs
 
     def get_reset_mask(self):
         '''get index of nearest correct answer, check if it is
@@ -87,9 +114,6 @@ class memory(nn.Module):
         4) reset_mask == top_hints == 0 (64)
         '''
         pass
-
-
-
 
 
 """
@@ -225,8 +249,10 @@ OLD CODE FOR REFERENCE
                     #  E Step
                     similarities = torch.matmul(q[i], torch.t(k_hat))
                     p_x_given_c_unnorm = torch.exp(similarities).detach()
-                    p_c = ((h_hat + self.beta) / torch.sum(h_hat + self.beta))
-                    p_c_given_x = (p_x_given_c_unnorm * p_c)/(torch.matmul(p_x_given_c_unnorm, p_c))
+                    p_c = (h_hat + self.beta)  # / torch.sum(h_hat + self.beta))
+                    joint = p_x_given_c_unnorm * p_c
+                    p_c_given_x = joint / joint.sum(0)
+                    # p_c_given_x = (p_x_given_c_unnorm * p_c)/(torch.matmul(p_x_given_c_unnorm, p_c))
                     next_gamma = p_c_given_x
 
                     #  M step
