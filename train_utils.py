@@ -34,8 +34,8 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
     #  Update memory
     if memory:
         if use_EM:
-            gan.memory.Roger_update_memory(q_real.detach(), true_target.detach())
-            gan.memory.Roger_update_memory(q_fake.detach(), fake_target.detach())
+            gan.memory.update_memory(q_real.detach(), true_target.detach())
+            gan.memory.update_memory(q_fake.detach(), fake_target.detach())
         else:
             gan.memory.update_memory_noEM(q_real.detach(), true_target.detach())
             gan.memory.update_memory_noEM(q_fake.detach(), fake_target.detach())
