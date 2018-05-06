@@ -115,7 +115,6 @@ class memory(nn.Module):
             self.memory_hist[upd_idxs][self.memory_hist[upd_idxs].shape[0] // 2:] = \
                 upd_hists[self.memory_hist[upd_idxs].shape[0] // 2:].cuda()
             self.memory_values[upd_idxs] = upd_vals.cuda()
-            #
         else:
             self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k])
             self.memory_key[upd_idxs] = upd_keys
@@ -147,7 +146,7 @@ class memory(nn.Module):
         result = (posterior * red_mem_vals).sum(1)
         return result, joint, red_mem_vals
 
-    def obtain_topk(self, q, label=None, label_bool=False):
+    def obtain_topk(self, q, label=None):
         '''compute top k matching indices over FULL keys
         input q, label
         1) compute similarity between q and K, get something of dim 64x4096 (batch size=64)
