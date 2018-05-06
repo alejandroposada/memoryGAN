@@ -103,5 +103,5 @@ ENV/
 results/
 data/
 .idea/
-MemoryGAN/
+memoryGAN/
 Would skip repository memoryGAN/
