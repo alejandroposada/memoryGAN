@@ -44,6 +44,9 @@ class memory(nn.Module):
 
     def query(self, q):
         result, _, __ = self.get_result(q)
+        #  clip values
+        result[result < self.epsilon] = self.epsilon
+        result[result > 1 - self.epsilon] = 1 - self.epsilon
         return result
 
     def update_memory(self, q, label):
