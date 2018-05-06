@@ -57,10 +57,32 @@ class memory(nn.Module):
         '''
         result, joint_, vals, = self.get_result(q)
         reset_mask = self.get_reset_mask(label, vals)
-        k_idxs = self.obtain_topk(q, label=label)
-        # EM - MATT
+        k_idxs = self.obtain_topk(q, label=label, label_bool=True)
 
-    def get_result(self, q, alpha=0.5):
+        # EM
+        gamma = 0.0  # same as initial posterior
+        h_hat = self.alpha * self.memory_hist[k_idxs]  # 64x128
+        k_hat = self.memory_key[k_idxs]  # 64x128x256
+        red_val = self.memory_values[k_idxs]  # 64x128, to be used in updates I guess
+
+        for _ in range(self.num_steps):
+            #  E Step
+            similarities = torch.matmul(q.view(q.size(0), 1, self.key_dim), torch.transpose(k_hat, 1, 2)).squeeze(1)  # 64x128
+            likelihood = torch.exp(similarities - 1.)  # 64x128
+            prior = h_hat + self.beta  # 64x128
+            joint = likelihood * prior  # 64x128
+            next_gamma = torch.div(joint, joint.sum(1).view(q.size(0), 1))  # 64x128
+            h_hat += (next_gamma - gamma).sum(1).unsqueeze(1).repeat(1, self.choose_k)  # 64x128 (may need to change the axis of sum)
+            upd_ratio = (next_gamma - gamma) / h_hat  # 64x128
+
+            #  M step
+            k_hat = k_hat * (1. - upd_ratio.unsqueeze(2).expand(-1, -1, self.key_dim))
+            k_hat += upd_ratio.unsqueeze(2).expand(-1, -1, self.key_dim) * q.unsqueeze(1).repeat(1, self.choose_k, 1)
+            k_hat = normalize(k_hat)
+
+            gamma = next_gamma
+
+    def get_result(self, q):
         '''compute posterior conditioned over top_k keys from before
         input q
         1) get top_k from get_hint(q)
@@ -73,7 +95,7 @@ class memory(nn.Module):
         '''
         k_idxs = self.obtain_topk(q)
         red_mem_keys = self.memory_key[k_idxs]  # 64x128x256
-        red_mem_hist = self.memory_hist[k_idxs] * alpha  # 64x128, mul by alpha for some reason
+        red_mem_hist = self.memory_hist[k_idxs] * self.alpha  # 64x128, mul by alpha for some reason
         red_mem_vals = self.memory_values[k_idxs]  # 64x128
         # Please check the following matmul: 64x128x256 * 64x256 --> 64x128
         similarities = torch.matmul(q.view(q.size(0), 1, self.key_dim),
@@ -85,7 +107,7 @@ class memory(nn.Module):
         result = (posterior * red_mem_vals).sum(1)
         return result, joint, red_mem_vals
 
-    def obtain_topk(self, q, label=None):
+    def obtain_topk(self, q, label=None, label_bool=False):
         '''compute top k matching indices over FULL keys
         input q, label
         1) compute similarity between q and K, get something of dim 64x4096 (batch size=64)
@@ -95,7 +117,7 @@ class memory(nn.Module):
         5) return the indices 64x128
         '''
         similarities = torch.matmul(q, torch.t(self.memory_key))  # size= 64x4096
-        if label != None:
+        if label_bool:
             is_wrong = torch.abs(label.unsqueeze(1).repeat(1, self.memory_size) -
                                  self.memory_values.unsqueeze(0).repeat(q.size(0), 1))  # 64x4096
             # ignored the minimum statement since it looks like it doesn't really do anything.
