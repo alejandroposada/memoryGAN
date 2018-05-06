@@ -143,13 +143,13 @@ if __name__ == '__main__':
     argparser.add_argument('--beta_1', type=float, default=0.999)
     argparser.add_argument('--model_file', type=str, default=None)
     #  --model_file results/checkpoints/example-28928.model
-    argparser.add_argument('--cuda', action='store_true', default=True)
+    argparser.add_argument('--cuda', action='store_true', default=False)
     argparser.add_argument('--display_result_every', type=int, default=640)   # 640
     argparser.add_argument('--checkpoint_interval', type=int, default=32000)  # 32000
     argparser.add_argument('--seed', type=int, default=1024)
     argparser.add_argument('--memory', action='store_true', default=True)  # use memory?
     argparser.add_argument('--use_EM', action='store_true', default=True)  # use EM in memory?
-    argparser.add_argument('--verbose', action='store_true', default=True)  # save internal memory info?
+    argparser.add_argument('--verbose', action='store_true', default=False)  # save internal memory info?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()
 

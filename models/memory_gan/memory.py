@@ -90,33 +90,29 @@ class memory(nn.Module):
 
             gamma = next_gamma
 
-        keys_upd = rep_oldest_idxs
-        vals_upd = rep_oldest_idxs
-        hists_upd = rep_oldest_idxs
-
         upd_idxs = rep_oldest_idxs
         upd_idxs[rep_reset_mask == 1] = k_idxs.reshape([-1])[rep_reset_mask == 1]
 
         upd_keys = rep_q
-        upd_keys[rep_reset_mask == 1] = keys_upd.reshape([-1, self.key_dim])[rep_reset_mask == 1]
+        upd_keys[rep_reset_mask == 1] = k_hat.reshape([-1, self.key_dim])[rep_reset_mask == 1]
 
         upd_vals = rep_label
-        upd_vals[rep_reset_mask == 1] = vals_upd.reshape([-1])[rep_reset_mask == 1]
+        upd_vals[rep_reset_mask == 1] = red_val.reshape([-1])[rep_reset_mask == 1]
 
         upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
-        upd_hists[rep_reset_mask == 1] = hists_upd.reshape([-1])
+        upd_hists[rep_reset_mask == 1] = h_hat.reshape([-1])[rep_reset_mask == 1]
+
+        self.memory_age += 1
 
         if self.is_cuda:
-            self.memory_age += torch.ones([self.memory_size]).cuda()
             self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k]).cuda()
-            self.memory_keys[upd_idxs] = upd_keys.cuda()
-            self.memory_vals[upd_idxs] = upd_vals.cuda()
+            self.memory_key[upd_idxs] = upd_keys.cuda()
+            self.memory_values[upd_idxs] = upd_vals.cuda()
             self.memory_hist[upd_idxs] = upd_hists.cuda()
         else:
-            self.memory_age += torch.ones([self.memory_size])
             self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k])
-            self.memory_keys[upd_idxs] = upd_keys
-            self.memory_vals[upd_idxs] = upd_vals
+            self.memory_key[upd_idxs] = upd_keys
+            self.memory_values[upd_idxs] = upd_vals
             self.memory_hist[upd_idxs] = upd_hists
 
     def get_result(self, q):
@@ -181,155 +177,3 @@ class memory(nn.Module):
     def get_oldest_idxs(self, batch_size):
         _, oldest_idxs = torch.topk(self.memory_age, k=1, sorted=False)
         return oldest_idxs.reshape([1,1]).repeat([batch_size, 1])
-
-
-"""
-OLD CODE FOR REFERENCE
-    def query(self, q):
-        #  compute P(x|c)
-        similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
-        p_x_given_c_unnorm = torch.exp(similarities)
-
-        #  compute P(c)  # Roger: technically, you don't need to divide by the sum here (last equality in eq(3))
-        p_c = ((self.memory_hist+self.beta)/torch.sum(self.memory_hist+self.beta))
-
-        #  compute P(c|x) from eq 1 of paper
-        p_c_given_x = (p_x_given_c_unnorm * p_c)
-
-        #  take only top k
-        p_c_given_x_approx, idxs = torch.topk(p_c_given_x, k=self.choose_k)
-
-        #  compute P(y|x) = \sum_i P(c=i|x)v_i from eq 4 of paper
-        p_y_given_x_unnorm = (self.memory_values[idxs] * p_c_given_x_approx).sum(1)
-        p_y_given_x = (p_y_given_x_unnorm / p_c_given_x_approx.sum(1))
-
-        #  clip values
-        p_y_given_x[p_y_given_x < self.epsilon] = self.epsilon
-        p_y_given_x[p_y_given_x > 1-self.epsilon] = 1-self.epsilon
-
-        return p_y_given_x
-
-    #  EM update of memory, 3.1.2
-    def update_memory(self, q, label):
-
-        #  compute P(x|c, v_c=y)
-        similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
-        p_x_given_c_unnorm = torch.exp(similarities)
-
-        #  compute P(c)
-        p_c = ((self.memory_hist+self.beta)/torch.sum(self.memory_hist+self.beta))
-
-        #  compute P(c|x, v_c=y) from eq 1 of paper
-        p_c_given_x = (p_x_given_c_unnorm * p_c)
-
-        p_v_c_eq_y = torch.ger(label, self.memory_values) + torch.ger(1-label, 1-self.memory_values)
-        p_c_given_x_v = (p_c_given_x*p_v_c_eq_y)
-        p_c_given_x_v_approx, idx = torch.topk(p_c_given_x_v, k=self.choose_k)
-
-        #  check if S contains correct label
-        s_with_correct_label =\
-            torch.eq(self.memory_values[idx], torch.transpose(label.expand(self.choose_k, len(label)), 0, 1))
-
-        for i, l in enumerate(s_with_correct_label):
-            if not l.any():
-                #  find oldest memory slot and copy information onto it
-                oldest_idx = torch.argmax(self.memory_age)
-                self.memory_key[oldest_idx] = q[i]
-                self.memory_hist[oldest_idx] = self.memory_hist.mean()
-                self.memory_age[oldest_idx] = 0
-                self.memory_values[oldest_idx] = label[i]
-            else:
-                idx_to_change = idx[i, l == 1]
-                gamma = 0
-                h_hat = self.alpha * self.memory_hist[idx_to_change]
-                k_hat = self.memory_key[idx_to_change]
-                for _ in range(self.num_steps):
-                    #  E Step
-                    similarities = torch.matmul(q[i], torch.transpose(k_hat, 1, 0))
-                    p_x_given_c_unnorm = torch.exp(similarities)
-                    p_c = ((h_hat + self.beta) / torch.sum(h_hat + self.beta))
-                    p_c_given_x = (p_x_given_c_unnorm * p_c)
-                    next_gamma = (p_c_given_x / p_c_given_x.sum(0))
-
-                    #  M step
-                    h_hat += next_gamma - gamma
-                    k_hat += torch.transpose(((next_gamma - gamma) / h_hat).
-                                             expand(self.key_dim, len(h_hat)), 0, 1)*(q[i] - k_hat)
-                    gamma = next_gamma
-
-                k_hat = normalize(k_hat)
-
-                self.memory_key[idx_to_change] = k_hat
-                self.memory_hist[idx_to_change] = h_hat
-                self.memory_age += 1e-5  # testing
-
-    def update_memory_noEM(self, q, label):
-        # compute similarity between batch of q and my mem_keys
-        similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
-        nearest_neighbours, idx = torch.topk(similarities, k=1)
-        for i in idx:
-            if self.memory_values[i] == label[i]:
-                self.memory_key[i] = (q[i] + self.memory_key[i])/(q[i] + self.memory_key[i]).norm(2)
-                self.memory_age += 1
-                self.memory_age[i] = 0
-            else:
-                oldest_idx = torch.argmax(self.memory_age)
-                self.memory_key[oldest_idx] = q[i]
-                self.memory_key[oldest_idx] = 0
-                self.memory_values[oldest_idx] = label[i]
-
-    def Roger_update_memory(self, q, label, n_steps=1):
-        # Goal: compute P(x|c, v_c=y)
-        # Start with finding indices where mem_value=label
-        indices = ((self.memory_values == label[0]) == 1).nonzero().squeeze()  # this assumes all labels are the same.
-        reduced_memory = self.memory_key[indices]  # memory with only the correct classes
-
-        # compute similarity between batch of q and my mem_keys with correct class
-        similarities = torch.matmul(q, torch.t(reduced_memory))
-        p_x_given_c_unnorm = torch.exp(similarities)
-
-        #  compute P(c)
-        p_c_unnorm = self.memory_hist[indices] + self.beta
-
-        #  compute P(c|x, v_c=y) from eq 1 of paper
-        p_c_given_x_v = (p_x_given_c_unnorm * p_c_unnorm)
-        _, unnorm_idxs = torch.topk(p_c_given_x_v, k=self.choose_k)
-        idxs = unnorm_idxs
-        for i in range(idxs.size(0)):
-            for j in range(idxs.size(1)):
-                idxs[i, j] = indices[unnorm_idxs[i, j]].tolist()
-
-        for i, l in enumerate(idxs):
-            if list(indices.size())[0] == 0:  # I don't think this ever happens...
-                #  find oldest memory slot and copy information onto it
-                oldest_idx = torch.argmax(self.memory_age)
-                self.memory_key[oldest_idx] = q[i]
-                self.memory_hist[oldest_idx] = self.memory_hist.mean()
-                self.memory_age[oldest_idx] = 0
-                self.memory_values[oldest_idx] = label[i]
-            else:
-                gamma = 0
-                alpha = 0.5
-                h_hat = alpha * self.memory_hist[idxs[i]]
-                k_hat = self.memory_key[idxs[i]]
-                for _ in range(n_steps):
-                    #  E Step
-                    similarities = torch.matmul(q[i], torch.t(k_hat))
-                    p_x_given_c_unnorm = torch.exp(similarities).detach()
-                    p_c = (h_hat + self.beta)  # / torch.sum(h_hat + self.beta))
-                    joint = p_x_given_c_unnorm * p_c
-                    p_c_given_x = joint / joint.sum(0)
-                    # p_c_given_x = (p_x_given_c_unnorm * p_c)/(torch.matmul(p_x_given_c_unnorm, p_c))
-                    next_gamma = p_c_given_x
-
-                    #  M step
-                    h_hat += next_gamma - gamma
-                    k_hat += torch.transpose(((next_gamma - gamma) / h_hat).
-                                             expand(self.key_dim, len(h_hat)), 0, 1)*(q[i] - k_hat)
-                    gamma = next_gamma
-                    k_hat = (k_hat/torch.norm(k_hat, p=2, dim=0))  # l2 normalize
-
-                self.memory_key[idxs[i]] = k_hat
-                self.memory_hist[idxs[i]] = h_hat
-        self.memory_age[:] += 1  # I guess...
-"""
