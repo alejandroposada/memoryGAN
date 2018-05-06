@@ -93,30 +93,28 @@ class memory(nn.Module):
 
             gamma = next_gamma
 
-        #upd_idxs = rep_oldest_idxs
-        #upd_idxs[rep_reset_mask == 1] = k_idxs.reshape([-1])[rep_reset_mask == 1]
+        upd_idxs = rep_oldest_idxs
+        upd_idxs[rep_reset_mask] = k_idxs.reshape([-1])[rep_reset_mask]
 
-        #upd_keys = rep_q
-        #upd_keys[rep_reset_mask == 1] = k_hat.reshape([-1, self.key_dim])[rep_reset_mask == 1]
+        upd_keys = rep_q
+        upd_keys[rep_reset_mask] = k_hat.reshape([-1, self.key_dim])[rep_reset_mask]
 
-        #upd_vals = rep_label
-        #upd_vals[rep_reset_mask == 1] = red_val.reshape([-1])[rep_reset_mask == 1]
+        upd_vals = rep_label
+        upd_vals[rep_reset_mask] = red_val.reshape([-1])[rep_reset_mask]
 
-        #upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
-        #upd_hists[rep_reset_mask == 1] = h_hat.reshape([-1])[rep_reset_mask == 1]
-
-        rep_oldest_idxs.masked_scatter_(rep_reset_mask, k_idxs.reshape([-1]))
-        rep_q.masked_scatter_(rep_reset_mask, k_hat.reshape([-1, self.key_dim]))
-        rep_label.masked_scatter_(rep_label, red_val.reshape([-1]))
-        upd_hists = torch.ones_like(rep_label) * self.memory_hist.mean()
-        upd_hists.masked_scatter_(rep_reset_mask, h_hat.reshape([-1]))
+        upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
+        upd_hists[rep_reset_mask] = h_hat.reshape([-1])[rep_reset_mask]
 
         self.memory_age += 1
         if self.is_cuda:
-            self.memory_age.put_(rep_oldest_idxs, torch.zeros([len(label) * self.choose_k]).cuda())
-            self.memory_values.pu_()[upd_idxs] = upd_vals.cuda()
+            self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]).cuda())
         else:
-            self.memory_age.put_(rep_oldest_idxs, torch.zeros([len(label) * self.choose_k]))
+            self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]))
+
+        self.memory_values.put_(upd_idxs, upd_vals)
+        self.memory_hist.put_(upd_idxs, upd_hists)
+
+        self.memory_key[upd_idxs] = upd_keys
 
         #if self.is_cuda:
         #    self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k]).cuda()
