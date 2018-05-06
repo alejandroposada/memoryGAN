@@ -106,9 +106,16 @@ class memory(nn.Module):
 
         if self.is_cuda:
             self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k]).cuda()
-            self.memory_key[upd_idxs] = upd_keys.cuda()
+            for i in range(len(self.memory_key[0])):
+                self.memory_key[upd_idxs][:, i] = upd_keys[:, i].cuda()
+
+            #self.memory_hist[upd_idxs] = upd_hists.cuda()
+            self.memory_hist[upd_idxs][:self.memory_hist[upd_idxs].shape[0] // 2] = \
+                upd_hists[:self.memory_hist[upd_idxs].shape[0] // 2].cuda()
+            self.memory_hist[upd_idxs][self.memory_hist[upd_idxs].shape[0] // 2:] = \
+                upd_hists[self.memory_hist[upd_idxs].shape[0] // 2:].cuda()
             self.memory_values[upd_idxs] = upd_vals.cuda()
-            self.memory_hist[upd_idxs] = upd_hists.cuda()
+            #
         else:
             self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k])
             self.memory_key[upd_idxs] = upd_keys
