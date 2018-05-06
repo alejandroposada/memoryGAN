@@ -75,17 +75,18 @@ def main():
                                   disc_train_loss.item(), gen_train_loss.item()))
 
                 if args.memory and args.verbose:
-                    h_per.append(gan.memory.memory_hist)
-                    k_per.append(gan.memory.memory_key)
-                    a_per.append(gan.memory.memory_age)
-                    v_per.append(gan.memory.memory_values)
+                    next_h, next_k, next_a, next_v = gan.memory.get_info_for_logging()
+                    h_per.append(next_h)
+                    k_per.append(next_k)
+                    a_per.append(next_a)
+                    v_per.append(next_v)
 
                     if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                         print('avg hist: {:.4f} avg age: {:.5f} avg key val: {:.4f}'
                               .format(h_per[-1].mean(), a_per[-1].mean(), v_per[-1].mean()))
 
-                    #if (total_examples != 0) and (total_examples % args.checkpoint_interval == 0):
-                    #    save_verbose(h_per, k_per, a_per, v_per)
+                    if (total_examples != 0) and (total_examples % args.checkpoint_interval == 0):
+                        save_verbose(h_per, k_per, a_per, v_per)
 
                 # Checkpoint model
                 total_examples += args.batch_size
@@ -149,7 +150,7 @@ if __name__ == '__main__':
     argparser.add_argument('--seed', type=int, default=1024)
     argparser.add_argument('--memory', action='store_true', default=True)  # use memory?
     argparser.add_argument('--use_EM', action='store_true', default=True)  # use EM in memory?
-    argparser.add_argument('--verbose', action='store_true', default=True)  # save internal memory info?
+    argparser.add_argument('--verbose', action='store_true', default=False)  # save internal memory info?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()
 
