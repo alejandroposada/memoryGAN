@@ -47,5 +47,6 @@ def timer(fun, **kwargs):
 def get_grads(model):
     return [p.grad for p in model.parameters()]
 
-def normalize(matrix):
-    return torch.transpose(torch.transpose(matrix, 1, 0)/matrix.norm(dim=1), 1, 0)
+def normalize(matrix, dim):
+    return matrix.div(matrix.norm(dim=dim, keepdim=True))
+    #return torch.transpose(torch.transpose(matrix, 1, 0)/matrix.norm(dim=1), 1, 0)

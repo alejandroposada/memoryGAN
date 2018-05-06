@@ -75,10 +75,11 @@ def main():
                                   disc_train_loss.item(), gen_train_loss.item()))
 
                 if args.memory and args.verbose:
-                    h_per.append(gan.memory.memory_hist)
-                    k_per.append(gan.memory.memory_key)
-                    a_per.append(gan.memory.memory_age)
-                    v_per.append(gan.memory.memory_values)
+                    next_h, next_k, next_a, next_v = gan.memory.get_info_for_logging()
+                    h_per.append(next_h)
+                    k_per.append(next_k)
+                    a_per.append(next_a)
+                    v_per.append(next_v)
 
                     if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                         print('avg hist: {:.4f} avg age: {:.5f} avg key val: {:.4f}'

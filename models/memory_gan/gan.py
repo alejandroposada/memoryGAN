@@ -23,7 +23,7 @@ class GAN(gan_super):
 
     def discriminate(self, x, label):
         q = self.dmn.forward(x)  # get query vec
-        qn = normalize(q)
+        qn = normalize(q, 1)
         self.q = qn
         post_prob = self.memory.query(qn)
         return post_prob, qn

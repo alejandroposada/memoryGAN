@@ -89,40 +89,52 @@ class memory(nn.Module):
             #  M step
             k_hat = k_hat * (1. - upd_ratio.unsqueeze(2).expand(-1, -1, self.key_dim))
             k_hat += upd_ratio.unsqueeze(2).expand(-1, -1, self.key_dim) * q.unsqueeze(1).repeat(1, self.choose_k, 1)
-            k_hat = normalize(k_hat)
+            k_hat = normalize(k_hat, 1)
 
             gamma = next_gamma
 
-        upd_idxs = rep_oldest_idxs
-        upd_idxs[rep_reset_mask == 1] = k_idxs.reshape([-1])[rep_reset_mask == 1]
+        #upd_idxs = rep_oldest_idxs
+        #upd_idxs[rep_reset_mask == 1] = k_idxs.reshape([-1])[rep_reset_mask == 1]
 
-        upd_keys = rep_q
-        upd_keys[rep_reset_mask == 1] = k_hat.reshape([-1, self.key_dim])[rep_reset_mask == 1]
+        #upd_keys = rep_q
+        #upd_keys[rep_reset_mask == 1] = k_hat.reshape([-1, self.key_dim])[rep_reset_mask == 1]
 
-        upd_vals = rep_label
-        upd_vals[rep_reset_mask == 1] = red_val.reshape([-1])[rep_reset_mask == 1]
+        #upd_vals = rep_label
+        #upd_vals[rep_reset_mask == 1] = red_val.reshape([-1])[rep_reset_mask == 1]
 
-        upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
-        upd_hists[rep_reset_mask == 1] = h_hat.reshape([-1])[rep_reset_mask == 1]
+        #upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
+        #upd_hists[rep_reset_mask == 1] = h_hat.reshape([-1])[rep_reset_mask == 1]
+
+        rep_oldest_idxs.masked_scatter_(rep_reset_mask, k_idxs.reshape([-1]))
+        rep_q.masked_scatter_(rep_reset_mask, k_hat.reshape([-1, self.key_dim]))
+        rep_label.masked_scatter_(rep_label, red_val.reshape([-1]))
+        upd_hists = torch.ones_like(rep_label) * self.memory_hist.mean()
+        upd_hists.masked_scatter_(rep_reset_mask, h_hat.reshape([-1]))
 
         self.memory_age += 1
-
         if self.is_cuda:
-            self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k]).cuda()
-            for i in range(len(self.memory_key[0])):
-                self.memory_key[upd_idxs][:, i] = upd_keys[:, i].cuda()
+            self.memory_age.put_(rep_oldest_idxs, torch.zeros([len(label) * self.choose_k]).cuda())
+            self.memory_values.pu_()[upd_idxs] = upd_vals.cuda()
+        else:
+            self.memory_age.put_(rep_oldest_idxs, torch.zeros([len(label) * self.choose_k]))
+
+        #if self.is_cuda:
+        #    self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k]).cuda()
+
+        #    self.memory_key[upd_idxs] = upd_keys.cuda()
 
             #self.memory_hist[upd_idxs] = upd_hists.cuda()
-            self.memory_hist[upd_idxs][:self.memory_hist[upd_idxs].shape[0] // 2] = \
-                upd_hists[:self.memory_hist[upd_idxs].shape[0] // 2].cuda()
-            self.memory_hist[upd_idxs][self.memory_hist[upd_idxs].shape[0] // 2:] = \
-                upd_hists[self.memory_hist[upd_idxs].shape[0] // 2:].cuda()
-            self.memory_values[upd_idxs] = upd_vals.cuda()
-        else:
-            self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k])
-            self.memory_key[upd_idxs] = upd_keys
-            self.memory_values[upd_idxs] = upd_vals
-            self.memory_hist[upd_idxs] = upd_hists
+        #    self.memory_hist[upd_idxs][:self.memory_hist[upd_idxs].shape[0] // 2] = \
+        #        upd_hists[:self.memory_hist[upd_idxs].shape[0] // 2].cuda()
+        #    self.memory_hist[upd_idxs][self.memory_hist[upd_idxs].shape[0] // 2:] = \
+        #        upd_hists[self.memory_hist[upd_idxs].shape[0] // 2:].cuda()
+
+        #    self.memory_values[upd_idxs] = upd_vals.cuda()
+        #else:
+        #    self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k])
+        #    self.memory_key[upd_idxs] = upd_keys
+        #    self.memory_values[upd_idxs] = upd_vals
+        #    self.memory_hist[upd_idxs] = upd_hists
 
     def get_result(self, q):
         '''compute posterior conditioned over top_k keys from before
@@ -184,5 +196,8 @@ class memory(nn.Module):
         return reset_mask  # 64
 
     def get_oldest_idxs(self, batch_size):
-        _, oldest_idxs = torch.topk(self.memory_age, k=1, sorted=False)
-        return oldest_idxs.reshape([1,1]).repeat([batch_size, 1])
+        _, oldest_idxs = torch.topk(self.memory_age, k=batch_size, sorted=False)
+        return oldest_idxs.reshape([batch_size, 1])
+
+    def get_info_for_logging(self):
+        return self.memory_hist.clone(), self.memory_key.clone(), self.memory_age.clone(), self.memory_values.clone()
