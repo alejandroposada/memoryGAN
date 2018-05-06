@@ -69,12 +69,13 @@ class memory(nn.Module):
         rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
         rep_q = q.unsqueeze(1).repeat([1, self.choose_k, 1]).reshape([-1, self.key_dim])
         rep_label = label.unsqueeze(1).repeat([1, self.choose_k]).reshape([-1])
+        #print('labels {}'.format(label.sum().item()))
 
         # EM
         gamma = 0.0  # same as initial posterior
         h_hat = self.alpha * self.memory_hist[k_idxs]  # 64x128
         k_hat = self.memory_key[k_idxs]  # 64x128x256
-        red_val = self.memory_values[k_idxs]  # 64x128, to be used in updates I guess
+        v_hat = self.memory_values[k_idxs]  # 64x128, to be used in updates I guess
 
         for _ in range(self.num_steps):
             #  E Step
@@ -93,30 +94,26 @@ class memory(nn.Module):
 
             gamma = next_gamma
 
-        #print(rep_reset_mask.sum())
-
-        upd_idxs = rep_oldest_idxs
-        upd_idxs[rep_reset_mask] = k_idxs.reshape([-1])[rep_reset_mask]
-
-        upd_keys = rep_q
-        upd_keys[rep_reset_mask] = k_hat.reshape([-1, self.key_dim])[rep_reset_mask]
-
-        upd_vals = rep_label
-        upd_vals[rep_reset_mask] = red_val.reshape([-1])[rep_reset_mask]
-
+        upd_idxs = k_idxs.reshape([-1]).masked_scatter(rep_reset_mask, rep_oldest_idxs)
+        upd_keys = k_hat.reshape([-1, self.key_dim]).masked_scatter(
+            rep_reset_mask.unsqueeze(1).repeat([1, self.key_dim]), rep_q)
+        upd_vals = v_hat.reshape([-1]).masked_scatter(rep_reset_mask, rep_label)
         upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
-        upd_hists[rep_reset_mask] = h_hat.reshape([-1])[rep_reset_mask]
+        upd_hists.masked_scatter_(rep_reset_mask, h_hat.reshape([-1]))
 
         self.memory_age += 1
         if self.is_cuda:
             self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]).cuda())
             self.memory_key.index_copy_(0, upd_idxs, upd_keys.cuda())
+            self.memory_values.index_copy_(0, upd_idxs, upd_vals.cuda())
         else:
             self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]))
             self.memory_key[upd_idxs] = upd_keys
+            self.memory_values.index_copy_(0, upd_idxs, upd_vals)
 
-        self.memory_values.index_copy_(0, upd_idxs, upd_vals.cuda())
         self.memory_hist.put_(upd_idxs, upd_hists)
+
+        #print('update values: {}'.format(upd_vals.sum().item()))
 
         del upd_idxs, upd_keys, upd_vals, upd_hists, rep_reset_mask, rep_oldest_idxs, rep_q, rep_label
         if self.is_cuda:
@@ -185,11 +182,68 @@ class memory(nn.Module):
         return reset_mask  # 64
 
     def get_oldest_idxs(self, batch_size):
-        _, oldest_idxs = torch.topk(self.memory_age, k=batch_size, sorted=False)
+        _, oldest_idxs = torch.topk(self.memory_age, k=batch_size, sorted=False, largest=True)
         return oldest_idxs.reshape([batch_size, 1])
 
     def get_info_for_logging(self):
         return self.memory_hist.clone(), self.memory_key.clone(), self.memory_age.clone(), self.memory_values.clone()
 
     def update_memory_noEM(self, q, label):
+        result, joint_, vals, = self.get_result(q)
+        reset_mask = self.get_reset_mask(label, vals)
+
+        k_idxs = self.obtain_topk(q, label=label)
+
+        #  tile for multiple update
+        rep_reset_mask = reset_mask.reshape([len(label), 1]).repeat(1, self.choose_k).reshape([-1])
+        rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
+        rep_q = q.unsqueeze(1).repeat([1, self.choose_k, 1]).reshape([-1, self.key_dim])
+        rep_label = label.unsqueeze(1).repeat([1, self.choose_k]).reshape([-1])
+
+        h_hat = self.memory_hist[k_idxs]  # 64x128
+        k_hat = self.memory_key[k_idxs]  # 64x128x256
+        v_hat = self.memory_values[k_idxs]  # 64x128, to be used in updates I guess
+
+        k_hat = normalize(k_hat + q.unsqueeze(1), 1)
+
+        upd_idxs = k_idxs.reshape([-1]).masked_scatter(rep_reset_mask, rep_oldest_idxs)
+        upd_keys = k_hat.reshape([-1, self.key_dim]).masked_scatter(
+            rep_reset_mask.unsqueeze(1).repeat([1, self.key_dim]), rep_q)
+        upd_vals = v_hat.reshape([-1]).masked_scatter(rep_reset_mask, rep_label)
+        upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
+        upd_hists.masked_scatter_(rep_reset_mask, h_hat.reshape([-1]))
+
+        self.memory_age += 1
+        if self.is_cuda:
+            self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]).cuda())
+            self.memory_key.index_copy_(0, upd_idxs, upd_keys.cuda())
+            self.memory_values.index_copy_(0, upd_idxs, upd_vals.cuda())
+        else:
+            self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]))
+            self.memory_key[upd_idxs] = upd_keys
+            self.memory_values.index_copy_(0, upd_idxs, upd_vals)
+
+        self.memory_hist.put_(upd_idxs, upd_hists)
+
+        #print('update values: {}'.format(upd_vals.sum().item()))
+
+        del upd_idxs, upd_keys, upd_vals, upd_hists, rep_reset_mask, rep_oldest_idxs, rep_q, rep_label
+        if self.is_cuda:
+            torch.cuda.empty_cache()
+
+        '''
+        # compute similarity between batch of q and mem_keys
+        similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
+        nearest_neighbours, idx = torch.topk(similarities, k=1)
+        for i in idx:
+            if self.memory_values[i] == label[i]:
+                self.memory_key[i] = (q[i] + self.memory_key[i]) / (q[i] + self.memory_key[i]).norm(2)
+                self.memory_age += 1
+                self.memory_age[i] = 0
+            else:
+                oldest_idx = torch.argmax(self.memory_age)
+                self.memory_key[oldest_idx] = q[i]
+                self.memory_key[oldest_idx] = 0
+                self.memory_values[oldest_idx] = label[i]
         pass
+        '''

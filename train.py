@@ -52,12 +52,6 @@ def main():
 
     np.random.seed(args.seed)  # reset training seed to ensure that batches remain the same between runs!
 
-    if args.memory and args.verbose:
-        h_per = []
-        k_per = []
-        a_per = []
-        v_per = []
-
     try:
         for epoch in range(prev_epoch, args.n_epochs):
 
@@ -78,18 +72,10 @@ def main():
 
                 if args.memory and args.verbose:
                     next_h, next_k, next_a, next_v = gan.memory.get_info_for_logging()
-                    #h_per.append(next_h)
-                    #k_per.append(next_k)
-                    #a_per.append(next_a)
-                    #v_per.append(next_v)
 
                     if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                         print('avg hist: {:.4f} avg age: {:.5f} avg key val: {:.4f}'
                               .format(next_h.mean(), next_a.mean(), next_v.mean()))
-
-                    if (total_examples != 0) and (total_examples % args.checkpoint_interval == 0):
-                        #save_verbose(h_per, k_per, a_per, v_per)
-                        pass
 
                 # Checkpoint model
                 total_examples += args.batch_size
