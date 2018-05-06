@@ -124,4 +124,7 @@ def save_verbose(h_per, k_per, a_per, v_per):
     a_per_time = torch.stack(a_per, 0)
     k_per_time = torch.stack(k_per, 0)
     h_per_time = torch.stack(h_per, 0)
-    pass
+    print(a_per_time)
+    print(v_per_time)
+    print(h_per_time)
+    print(k_per_time)
