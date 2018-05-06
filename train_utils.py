@@ -29,14 +29,14 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
 
     # Calculate Dloss
     disc_train_loss = gan.Dloss(true_disc_result, fake_disc_result)
-    disc_train_loss.backward(retain_graph=True)  # added retain_Graph
+    disc_train_loss.backward()  # added retain_Graph
     # print(gan.dmn.conv4.bias.grad)
 
     # Update memory
     if memory:
         if use_EM:
-            gan.memory.update_memory(q_real, true_target)  # removed detach
-            gan.memory.update_memory(q_fake, fake_target)  # removed detach
+            gan.memory.update_memory(q_real.detach(), true_target.detach())  # removed detach
+            gan.memory.update_memory(q_fake.detach(), fake_target.detach())  # removed detach
         else:
             gan.memory.update_memory_noEM(q_real.detach(), true_target.detach())
             gan.memory.update_memory_noEM(q_fake.detach(), fake_target.detach())
@@ -63,7 +63,7 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
     disc_result, _ = gan.discriminate(fake_batch, fake_target)
     gen_train_loss = gan.Gloss(disc_result)
 
-    gen_train_loss.backward(retain_graph=True)  # added retain_graph
+    gen_train_loss.backward()  # added retain_graph
     torch.nn.utils.clip_grad_norm_(gan.mcgn.parameters(), grad_clip)
     gen_optimizer.step()  # set for generator only
 
