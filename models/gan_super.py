@@ -31,7 +31,7 @@ class gan_super(nn.Module):
         return self.dmn.forward(x), None
 
     def generate(self, z):
-        return self.mcgn.forward(z), None
+        return self.mcgn.forward(z)
 
     def Dloss(self, true_output, fake_output):
         return -torch.mean(torch.log(true_output)) - torch.mean(torch.log(1 - fake_output))
