@@ -150,7 +150,7 @@ class memory(nn.Module):
         result = (posterior * red_mem_vals).sum(1)
         return result, joint, red_mem_vals
 
-    def obtain_topk(self, q, label=None, label_bool=False):
+    def obtain_topk(self, q, label=None):
         '''compute top k matching indices over FULL keys
         input q, label
         1) compute similarity between q and K, get something of dim 64x4096 (batch size=64)
