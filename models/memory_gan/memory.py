@@ -17,8 +17,9 @@ class memory(nn.Module):
         self.choose_k = min(choose_k, self.memory_size)
         self.alpha = alpha
         self.num_steps = num_steps
+        self.is_cuda = is_cuda
 
-        if is_cuda:
+        if self.is_cuda:
             self.memory_key = torch.zeros([self.memory_size, self.key_dim]).cuda()  # K in 3.1 of paper
             self.memory_values = torch.ones([self.memory_size]).cuda()
             self.memory_values[self.memory_size // 2:] = 0                          # v in 3.1 of paper
@@ -58,7 +59,44 @@ class memory(nn.Module):
         result, joint_, vals, = self.get_result(q)
         reset_mask = self.get_reset_mask(label, vals)
         k_idxs = self.obtain_topk(q, label=label)
+
+        #  tile for multiple update
+        rep_reset_mask = reset_mask.reshape([len(label), 1]).repeat(1, self.choose_k).reshape([-1])
+        rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
+        rep_q = q.unsqueeze(1).repeat([1, self.choose_k, 1]).reshape([-1, self.key_dim])
+        rep_label = label.unsqueeze(1).repeat([1, self.choose_k]).reshape([-1])
+
         # EM - MATT
+        print('pass')
+        keys_upd = rep_oldest_idxs
+        vals_upd = rep_oldest_idxs
+        hists_upd = rep_oldest_idxs
+
+        upd_idxs = rep_oldest_idxs
+        upd_idxs[rep_reset_mask == 1] = k_idxs.reshape([-1])[rep_reset_mask == 1]
+
+        upd_keys = rep_q
+        upd_keys[rep_reset_mask == 1] = keys_upd.reshape([-1, self.key_dim])[rep_reset_mask == 1]
+
+        upd_vals = rep_label
+        upd_vals[rep_reset_mask == 1] = vals_upd.reshape([-1])[rep_reset_mask == 1]
+
+        upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
+        upd_hists[rep_reset_mask == 1] = hists_upd.reshape([-1])
+
+        if self.is_cuda:
+            self.memory_age += torch.ones([self.memory_size]).cuda()
+            self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k]).cuda()
+            self.memory_keys[upd_idxs] = upd_keys.cuda()
+            self.memory_vals[upd_idxs] = upd_vals.cuda()
+            self.memory_hist[upd_idxs] = upd_hists.cuda()
+        else:
+            self.memory_age += torch.ones([self.memory_size])
+            self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k])
+            self.memory_keys[upd_idxs] = upd_keys
+            self.memory_vals[upd_idxs] = upd_vals
+            self.memory_hist[upd_idxs] = upd_hists
+
 
     def get_result(self, q, alpha=0.5):
         '''compute posterior conditioned over top_k keys from before
@@ -95,7 +133,7 @@ class memory(nn.Module):
         5) return the indices 64x128
         '''
         similarities = torch.matmul(q, torch.t(self.memory_key))  # size= 64x4096
-        if label != None:
+        if label is not None:
             is_wrong = torch.abs(label.unsqueeze(1).repeat(1, self.memory_size) -
                                  self.memory_values.unsqueeze(0).repeat(q.size(0), 1))  # 64x4096
             # ignored the minimum statement since it looks like it doesn't really do anything.
@@ -117,6 +155,10 @@ class memory(nn.Module):
         sliced_hints = teacher_hints[:, 0]
         reset_mask = torch.eq(torch.zeros_like(sliced_hints), sliced_hints)
         return reset_mask  # 64
+
+    def get_oldest_idxs(self, batch_size):
+        _, oldest_idxs = torch.topk(self.memory_age, k=1, sorted=False)
+        return oldest_idxs.reshape([1,1]).repeat([batch_size, 1])
 
 
 """
