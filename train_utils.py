@@ -15,7 +15,7 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
     true_disc_result, q_real = gan.discriminate(true_batch, true_target)
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
-    fake_target = torch.zeros(batch_size)
+    fake_target = torch.empty(batch_size).uniform_(-1, 1)
 
     if is_cuda:
         z = torch.randn(batch_size, gan.z_dim).cuda()
@@ -48,7 +48,7 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
     disc_true_accuracy = torch.sum(true_disc_result > 0.5).item() / batch_size
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
-    fake_target = torch.ones(batch_size)
+    fake_target = torch.empty(batch_size).uniform_(-1, 1)
 
     if is_cuda:
         z = torch.randn(batch_size, gan.z_dim).cuda()
