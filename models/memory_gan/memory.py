@@ -108,13 +108,18 @@ class memory(nn.Module):
         self.memory_age += 1
         if self.is_cuda:
             self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]).cuda())
-            self.memory_key[upd_idxs] = upd_keys.cuda()
+            #self.memory_key[upd_idxs] = upd_keys.cuda()
+            self.memory_key.index_copy_(0, upd_idxs, upd_keys.cuda())
         else:
             self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]))
             self.memory_key[upd_idxs] = upd_keys
 
-        self.memory_values.put_(upd_idxs, upd_vals)
+        #self.memory_values.put_(upd_idxs, upd_vals)
         self.memory_hist.put_(upd_idxs, upd_hists)
+
+        del upd_idxs, upd_keys, upd_vals, upd_hists, rep_reset_mask, rep_oldest_idxs, rep_q, rep_label
+        if self.is_cuda:
+            torch.cuda.empty_cache()
 
 
     def get_result(self, q):
@@ -182,3 +187,6 @@ class memory(nn.Module):
 
     def get_info_for_logging(self):
         return self.memory_hist.clone(), self.memory_key.clone(), self.memory_age.clone(), self.memory_values.clone()
+
+    def update_memory_noEM(self, q, label):
+        pass

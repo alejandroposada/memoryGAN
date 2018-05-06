@@ -1,6 +1,7 @@
 # stdlib imports
 import argparse
 import os
+import time
 
 # thirdparty imports
 import torch
@@ -63,6 +64,7 @@ def main():
             disc_losses_epoch = []
             gen_losses_epoch = []
             for idx, (true_batch, _) in enumerate(train_loader):
+                #time.sleep(1)
                 disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy \
                         = train_step(gan=gan, batch_size=args.batch_size, is_cuda=args.cuda, true_batch=true_batch,
                                      grad_clip=args.grad_clip, disc_optimizer=disc_optimizer,
