@@ -89,7 +89,7 @@ def create_new_model(dataset, is_cuda, learning_rate, beta_0, beta_1, memory):
     else:
         gan = GAN(dataset, is_cuda)
 
-    fixed_noise = torch.randn(9, gan.z_dim)
+    fixed_noise = torch.empty(9, gan.z_dim).uniform_(-1, 1)
 
     if is_cuda:
         gan.cuda()
