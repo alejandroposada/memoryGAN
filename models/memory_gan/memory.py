@@ -93,6 +93,8 @@ class memory(nn.Module):
 
             gamma = next_gamma
 
+        #print(rep_reset_mask.sum())
+
         upd_idxs = rep_oldest_idxs
         upd_idxs[rep_reset_mask] = k_idxs.reshape([-1])[rep_reset_mask]
 
@@ -108,13 +110,12 @@ class memory(nn.Module):
         self.memory_age += 1
         if self.is_cuda:
             self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]).cuda())
-            #self.memory_key[upd_idxs] = upd_keys.cuda()
             self.memory_key.index_copy_(0, upd_idxs, upd_keys.cuda())
         else:
             self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]))
             self.memory_key[upd_idxs] = upd_keys
 
-        #self.memory_values.put_(upd_idxs, upd_vals)
+        self.memory_values.index_copy_(0, upd_idxs, upd_vals.cuda())
         self.memory_hist.put_(upd_idxs, upd_hists)
 
         del upd_idxs, upd_keys, upd_vals, upd_hists, rep_reset_mask, rep_oldest_idxs, rep_q, rep_label
@@ -161,6 +162,7 @@ class memory(nn.Module):
         if label is not None:
             is_wrong = torch.abs(label.unsqueeze(1).repeat(1, self.memory_size) -
                                  self.memory_values.unsqueeze(0).repeat(q.size(0), 1))  # 64x4096
+            is_wrong = torch.clamp(is_wrong, max=1.0, min=0)
             # ignored the minimum statement since it looks like it doesn't really do anything.
             similarities = similarities - 2 * is_wrong
         likelihood = torch.exp(similarities - 1.)  # 64x4096
@@ -176,7 +178,8 @@ class memory(nn.Module):
         3) take top teacher hint per (top_hints has dim 64)
         4) reset_mask == top_hints == 0 (64)
         '''
-        teacher_hints = 1.0 - torch.abs(label.unsqueeze(1).repeat(1, val.size(1)) - val)  # 64x128
+        teacher_hints = torch.abs(label.unsqueeze(1).repeat(1, val.size(1)) - val)  # 64x128
+        teacher_hints = 1.0 - torch.clamp(teacher_hints, max=1.0, min=0)
         sliced_hints = teacher_hints[:, 0]
         reset_mask = torch.eq(torch.zeros_like(sliced_hints), sliced_hints)
         return reset_mask  # 64

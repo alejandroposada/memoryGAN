@@ -127,9 +127,11 @@ def save_verbose(h_per, k_per, a_per, v_per):
 
     k_added = [(k_per_time[i].sum(1) != 0).sum().item() for i in range(len(k_per_time))]
     v_means = [v_per_time[i].mean().item() for i in range(len(k_per_time))]
+    h_means = [h_per_time[i].mean().item() for i in range(len(k_per_time))]
 
-    print(a_per_time)
-    print(v_per_time)
-    print(h_per_time)
+    #print(a_per_time)
+    #print(v_per_time)
+    #print(h_per_time)
     print('value mean over time: {}'.format(v_means))
-    print('keys that are non-zero: {}'.format(k_added))
+    print('proportion of keys that are non-zero over time: {}'.format(k_added))
+    print('hist mean over time: {}'.format(h_means))
