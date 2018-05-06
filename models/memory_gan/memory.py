@@ -90,33 +90,29 @@ class memory(nn.Module):
 
             gamma = next_gamma
 
-        keys_upd = rep_oldest_idxs
-        vals_upd = rep_oldest_idxs
-        hists_upd = rep_oldest_idxs
-
         upd_idxs = rep_oldest_idxs
         upd_idxs[rep_reset_mask == 1] = k_idxs.reshape([-1])[rep_reset_mask == 1]
 
         upd_keys = rep_q
-        upd_keys[rep_reset_mask == 1] = keys_upd.reshape([-1, self.key_dim])[rep_reset_mask == 1]
+        upd_keys[rep_reset_mask == 1] = k_hat.reshape([-1, self.key_dim])[rep_reset_mask == 1]
 
         upd_vals = rep_label
-        upd_vals[rep_reset_mask == 1] = vals_upd.reshape([-1])[rep_reset_mask == 1]
+        upd_vals[rep_reset_mask == 1] = red_val.reshape([-1])[rep_reset_mask == 1]
 
         upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
-        upd_hists[rep_reset_mask == 1] = hists_upd.reshape([-1])
+        upd_hists[rep_reset_mask == 1] = h_hat.reshape([-1])[rep_reset_mask == 1]
 
         if self.is_cuda:
             self.memory_age += torch.ones([self.memory_size]).cuda()
             self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k]).cuda()
-            self.memory_keys[upd_idxs] = upd_keys.cuda()
-            self.memory_vals[upd_idxs] = upd_vals.cuda()
+            self.memory_key[upd_idxs] = upd_keys.cuda()
+            self.memory_values[upd_idxs] = upd_vals.cuda()
             self.memory_hist[upd_idxs] = upd_hists.cuda()
         else:
             self.memory_age += torch.ones([self.memory_size])
             self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k])
-            self.memory_keys[upd_idxs] = upd_keys
-            self.memory_vals[upd_idxs] = upd_vals
+            self.memory_key[upd_idxs] = upd_keys
+            self.memory_values[upd_idxs] = upd_vals
             self.memory_hist[upd_idxs] = upd_hists
 
     def get_result(self, q):
