@@ -41,9 +41,11 @@ class GAN(gan_super):
         return fake_batch
 
     def Dloss(self, true_output, fake_output):
-        I_hat = -torch.mean(F.cosine_similarity(self.key, self.q))
+        # I_hat = -torch.mean(F.cosine_similarity(self.key, self.q))
+        I_hat = F.mse_loss(self.key, self.q)
         return -torch.mean(torch.log(true_output)) - torch.mean(torch.log(1 - fake_output)) + self.lamb*I_hat
 
     def Gloss(self, fake_output):
-        I_hat = -torch.mean(F.cosine_similarity(self.key, self.q))
+        # I_hat = -torch.mean(F.cosine_similarity(self.key, self.q))
+        I_hat = F.mse_loss(self.key, self.q)
         return -torch.mean(torch.log(fake_output)) + self.lamb*I_hat

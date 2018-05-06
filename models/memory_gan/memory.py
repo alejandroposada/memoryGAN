@@ -100,6 +100,7 @@ class memory(nn.Module):
         upd_vals = v_hat.reshape([-1]).masked_scatter(rep_reset_mask, rep_label)
         upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
         upd_hists.masked_scatter_(rep_reset_mask, h_hat.reshape([-1]))
+        print(rep_reset_mask.sum(0))
 
         self.memory_age += 1
         if self.is_cuda:
