@@ -60,7 +60,7 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
     gan.mcgn.zero_grad()
     fake_batch = gan.generate(z)
 
-    disc_result, _ = gan.discriminate(fake_batch, fake_target)
+    disc_result, q_fake = gan.discriminate(fake_batch, fake_target)
     gen_train_loss = gan.Gloss(disc_result)
 
     gen_train_loss.backward()
