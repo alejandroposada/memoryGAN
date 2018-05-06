@@ -108,31 +108,14 @@ class memory(nn.Module):
         self.memory_age += 1
         if self.is_cuda:
             self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]).cuda())
+            self.memory_key[upd_idxs] = upd_keys.cuda()
         else:
             self.memory_age.put_(upd_idxs, torch.zeros([len(label) * self.choose_k]))
+            self.memory_key[upd_idxs] = upd_keys
 
         self.memory_values.put_(upd_idxs, upd_vals)
         self.memory_hist.put_(upd_idxs, upd_hists)
 
-        self.memory_key[upd_idxs] = upd_keys
-
-        #if self.is_cuda:
-        #    self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k]).cuda()
-
-        #    self.memory_key[upd_idxs] = upd_keys.cuda()
-
-            #self.memory_hist[upd_idxs] = upd_hists.cuda()
-        #    self.memory_hist[upd_idxs][:self.memory_hist[upd_idxs].shape[0] // 2] = \
-        #        upd_hists[:self.memory_hist[upd_idxs].shape[0] // 2].cuda()
-        #    self.memory_hist[upd_idxs][self.memory_hist[upd_idxs].shape[0] // 2:] = \
-        #        upd_hists[self.memory_hist[upd_idxs].shape[0] // 2:].cuda()
-
-        #    self.memory_values[upd_idxs] = upd_vals.cuda()
-        #else:
-        #    self.memory_age[upd_idxs] = torch.zeros([len(label) * self.choose_k])
-        #    self.memory_key[upd_idxs] = upd_keys
-        #    self.memory_values[upd_idxs] = upd_vals
-        #    self.memory_hist[upd_idxs] = upd_hists
 
     def get_result(self, q):
         '''compute posterior conditioned over top_k keys from before
