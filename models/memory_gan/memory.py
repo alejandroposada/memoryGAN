@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from helpers import normalize
-
+import numpy as np
 
 class memory(nn.Module):
     """DISCRIMINATIVE MEMORY NETWORK """
@@ -95,6 +95,24 @@ class memory(nn.Module):
 
             gamma = next_gamma
 
+        upd_idxs = np.where(rep_reset_mask, rep_oldest_idxs, k_idxs.reshape([-1]))
+        upd_keys = np.where(rep_reset_mask.unsqueeze(1).repeat([1, self.key_dim]),
+                            rep_q, k_hat.reshape([-1, self.key_dim]))
+        upd_vals = np.where(rep_reset_mask, rep_label, v_hat.reshape([-1]))
+        upd_hists = np.where(rep_reset_mask, torch.ones_like(rep_label)*self.memory_hist.mean(), h_hat.reshape([-1]))
+
+        if self.is_cuda:
+            upd_idxs = torch.from_numpy(upd_idxs).cuda()
+            upd_keys = torch.from_numpy(upd_keys).cuda()
+            upd_vals = torch.from_numpy(upd_vals).cuda()
+            upd_hists = torch.from_numpy(upd_hists).cuda()
+        else:
+            upd_idxs = torch.from_numpy(upd_idxs)
+            upd_keys = torch.from_numpy(upd_keys)
+            upd_vals = torch.from_numpy(upd_vals)
+            upd_hists = torch.from_numpy(upd_hists)
+
+        '''
         upd_idxs = k_idxs.reshape([-1])
         upd_idxs = upd_idxs.masked_scatter(rep_reset_mask, rep_oldest_idxs)
 
@@ -108,6 +126,7 @@ class memory(nn.Module):
         upd_hists = upd_hists.masked_scatter_(rep_reset_mask, torch.ones_like(rep_label)*self.memory_hist.mean())
         # print((upd_hists - h_hat.reshape([-1])))
         # print(rep_reset_mask.sum(0))
+        '''
 
         self.memory_age += 1
         if self.is_cuda:
@@ -178,11 +197,8 @@ class memory(nn.Module):
         return k_idxs
 
     def get_reset_mask(self, label, val):
-        '''get index of nearest correct answer, check if it is
-        1) teacher_hints = |label-val| broadcasted to 64x128
-        2) teacher_hints = 1 - min(1, teacher_hints)
-        3) take top teacher hint per (top_hints has dim 64)
-        4) reset_mask == top_hints == 0 (64)
+        '''returns 1 if there is a mismatch
+        i.e. replace key and value with oldest key and its value
         '''
         teacher_hints = torch.abs(label.unsqueeze(1).repeat(1, val.size(1)) - val)  # 64x128
         teacher_hints = 1.0 - torch.clamp(teacher_hints, max=1.0, min=0)
@@ -205,8 +221,7 @@ class memory(nn.Module):
 
         #  tile for multiple update
         rep_reset_mask = reset_mask.reshape([len(label), 1]).repeat(1, self.choose_k).reshape([-1])
-        #rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
-        rep_oldest_idxs = self.get_oldest_idxs().repeat([len(label), 1]).reshape([-1])
+        rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
         rep_q = q.unsqueeze(1).repeat([1, self.choose_k, 1]).reshape([-1, self.key_dim])
         rep_label = label.unsqueeze(1).repeat([1, self.choose_k]).reshape([-1])
 
