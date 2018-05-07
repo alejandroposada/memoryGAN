@@ -61,13 +61,13 @@ class memory(nn.Module):
         '''
         result, joint_, vals, = self.get_result(q)
         reset_mask = self.get_reset_mask(label, vals)
+        # print(reset_mask)
 
         k_idxs = self.obtain_topk(q, label=label)
         
         #  tile for multiple update
         rep_reset_mask = reset_mask.reshape([len(label), 1]).repeat(1, self.choose_k).reshape([-1])
-        # rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
-        rep_oldest_idxs = self.get_oldest_idxs().repeat([len(label), 1]).reshape([-1])
+        rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
         rep_q = q.unsqueeze(1).repeat([1, self.choose_k, 1]).reshape([-1, self.key_dim])
         rep_label = label.unsqueeze(1).repeat([1, self.choose_k]).reshape([-1])
         #print('labels {}'.format(label.sum().item()))
@@ -76,7 +76,7 @@ class memory(nn.Module):
         gamma = 0.0  # same as initial posterior
         h_hat = self.alpha * self.memory_hist[k_idxs]  # 64x128
         k_hat = self.memory_key[k_idxs]  # 64x128x256
-        v_hat = self.memory_values[k_idxs]  # 64x128, to be used in updates I guess
+        v_hat = self.memory_values[k_idxs]  # 64x128, to be used in updates
 
         for _ in range(self.num_steps):
             #  E Step
@@ -85,7 +85,7 @@ class memory(nn.Module):
             prior = h_hat + self.beta  # 64x128
             joint = likelihood * prior  # 64x128
             next_gamma = torch.div(joint, joint.sum(1).view(q.size(0), 1))  # 64x128
-            h_hat += (next_gamma - gamma).sum(1).unsqueeze(1).repeat(1, self.choose_k)  # 64x128 (may need to change the axis of sum)
+            h_hat = h_hat + (next_gamma - gamma).sum(1).unsqueeze(1)  # 64x128 (may need to change the axis of sum)
             upd_ratio = (next_gamma - gamma) / h_hat  # 64x128
 
             #  M step
@@ -95,14 +95,19 @@ class memory(nn.Module):
 
             gamma = next_gamma
 
-        upd_idxs = k_idxs.reshape([-1]).masked_scatter(rep_reset_mask, rep_oldest_idxs)
-        upd_keys = k_hat.reshape([-1, self.key_dim]).masked_scatter(
-            rep_reset_mask.unsqueeze(1).repeat([1, self.key_dim]), rep_q)
-        upd_vals = v_hat.reshape([-1]).masked_scatter(rep_reset_mask, rep_label)
-        upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
-        upd_hists.masked_scatter_(rep_reset_mask, h_hat.reshape([-1]))
-        # print(rep_reset_mask.sum(0))
+        upd_idxs = k_idxs.reshape([-1])
+        upd_idxs = upd_idxs.masked_scatter(rep_reset_mask, rep_oldest_idxs)
 
+        upd_keys = k_hat.reshape([-1, self.key_dim])
+        upd_keys = upd_keys.masked_scatter(rep_reset_mask.unsqueeze(1).repeat([1, self.key_dim]), rep_q)
+
+        upd_vals = v_hat.reshape([-1])
+        upd_vals = upd_vals.masked_scatter(rep_reset_mask, rep_label)
+
+        upd_hists = h_hat.reshape([-1])
+        upd_hists = upd_hists.masked_scatter_(rep_reset_mask, torch.ones_like(rep_label)*self.memory_hist.mean())
+        # print((upd_hists - h_hat.reshape([-1])))
+        # print(rep_reset_mask.sum(0))
 
         self.memory_age += 1
         if self.is_cuda:
@@ -165,6 +170,7 @@ class memory(nn.Module):
             is_wrong = torch.clamp(is_wrong, max=1.0, min=0)
             # ignored the minimum statement since it looks like it doesn't really do anything.
             similarities = similarities - 2 * is_wrong
+
         likelihood = torch.exp(similarities - 1.)  # 64x4096
         prior = self.memory_hist.unsqueeze(0).repeat(q.size(0), 1) + self.beta
         p_c_given_x_est = likelihood * prior
@@ -184,11 +190,9 @@ class memory(nn.Module):
         reset_mask = torch.eq(torch.zeros_like(sliced_hints), sliced_hints)
         return reset_mask  # 64
 
-    def get_oldest_idxs(self):
-        _, oldest_idxs = torch.topk(self.memory_age, k=self.choose_k, sorted=False, largest=True)
-        #_, oldest_idxs = torch.topk(self.memory_age, k=batch_size, sorted=False, largest=True)
-        #return oldest_idxs.reshape([batch_size, 1])
-        return oldest_idxs
+    def get_oldest_idxs(self, batch_size):
+        _, oldest_idxs = torch.topk(self.memory_age, k=batch_size, sorted=False, largest=True)
+        return oldest_idxs.reshape([batch_size, 1])
 
     def get_info_for_logging(self):
         return self.memory_hist.clone(), self.memory_key.clone(), self.memory_age.clone(), self.memory_values.clone()
