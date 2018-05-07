@@ -60,14 +60,15 @@ def load_model(model_file, is_cuda, learning_rate, beta_0, beta_1):
     dataset = from_before['train_set']
     memory = from_before['memory']
     use_EM = from_before['use_EM']
+    use_mcgn = from_before['use_mcgn']
     disc_optimizer_state_dict = from_before['disc_optimizer']
     gen_optimizer_state_dict = from_before['gen_optimizer']
 
     # load generator and discriminator
     if memory:
-        gan = MemGAN(dataset, is_cuda)
+        gan = MemGAN(dataset, is_cuda, use_mcgn)
     else:
-        gan = GAN(dataset)
+        gan = GAN(dataset, is_cuda)
 
     if is_cuda:
         gan.cuda()
@@ -80,12 +81,12 @@ def load_model(model_file, is_cuda, learning_rate, beta_0, beta_1):
     gen_optimizer.load_state_dict(gen_optimizer_state_dict)
 
     return total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, \
-           disc_loss_per_epoch, prev_epoch, gan, disc_optimizer, gen_optimizer, memory, use_EM
+           disc_loss_per_epoch, prev_epoch, gan, disc_optimizer, gen_optimizer, memory, use_EM, use_mcgn
 
 
-def create_new_model(dataset, is_cuda, learning_rate, beta_0, beta_1, memory):
+def create_new_model(dataset, is_cuda, learning_rate, beta_0, beta_1, memory, use_mcgn=True):
     if memory:
-        gan = MemGAN(dataset, is_cuda)
+        gan = MemGAN(dataset, is_cuda, use_mcgn)
     else:
         gan = GAN(dataset, is_cuda)
 
