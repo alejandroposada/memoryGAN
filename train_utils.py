@@ -48,11 +48,11 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
     disc_true_accuracy = torch.sum(true_disc_result > 0.5).item() / batch_size
 
     #  Sample minibatch of m noise samples from noise prior p_g(z) and transform
-    fake_target = torch.ones(batch_size)
+    fake_target2 = torch.ones(batch_size)
 
     if is_cuda:
         z = torch.empty(batch_size, gan.z_dim).uniform_(-1, 1).cuda()
-        fake_target = fake_target.cuda()
+        fake_target2 = fake_target2.cuda()
     else:
         z = torch.empty(batch_size, gan.z_dim).uniform_(-1, 1)
 
@@ -60,7 +60,7 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
     gan.mcgn.zero_grad()
     fake_batch = gan.generate(z)
 
-    disc_result, q_fake = gan.discriminate(fake_batch, fake_target)
+    disc_result, q_fake2 = gan.discriminate(fake_batch, fake_target2)
     gen_train_loss = gan.Gloss(disc_result)
 
     gen_train_loss.backward()
@@ -69,8 +69,8 @@ def train_step(gan, batch_size, is_cuda, true_batch, grad_clip, disc_optimizer, 
 
     if memory:
         if use_EM:
-            gan.memory.update_memory(q_fake.detach(), fake_target.detach())
+            gan.memory.update_memory(q_fake2.detach(), fake_target.detach())
         else:
-            gan.memory.update_memory_noEM(q_fake.detach(), fake_target.detach())
+            gan.memory.update_memory_noEM(q_fake2.detach(), fake_target.detach())
 
     return disc_train_loss, gen_train_loss, disc_true_accuracy, disc_fake_accuracy
