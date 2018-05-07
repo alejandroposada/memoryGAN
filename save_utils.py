@@ -43,7 +43,7 @@ def save_image_sample(dataset, batch, is_cuda, total_examples, directory):
 
 
 def save_checkpoint(total_examples, gan, gen_losses, disc_losses, disc_loss_per_epoch, gen_loss_per_epoch,
-                    fixed_noise, epoch, directory, disc_optimizer, gen_optimizer, train_set, memory, use_EM):
+                    fixed_noise, epoch, directory, disc_optimizer, gen_optimizer, train_set, memory, use_EM, use_mcgn):
     basename = directory+"/example-{}".format(total_examples)
     model_fname = basename + ".model"
     state = {
@@ -59,7 +59,8 @@ def save_checkpoint(total_examples, gan, gen_losses, disc_losses, disc_loss_per_
         'gen_optimizer': gen_optimizer.state_dict(),
         'train_set': train_set,
         'memory': memory,
-        'use_EM': use_EM
+        'use_EM': use_EM,
+        'use_mcgn': use_mcgn
     }
     torch.save(state, model_fname)
 
@@ -98,14 +99,14 @@ def save_learning_curve_epoch(gen_losses, disc_losses, total_epochs, directory):
 
 def save_all(total_examples, fixed_noise, gan, disc_loss_per_epoch, gen_loss_per_epoch, gen_losses,
              disc_losses, epoch, checkpoint_dir, is_cuda, gen_images_dir, train_summaries_dir,
-             disc_optimizer, gen_optimizer, train_set, memory, use_EM):
+             disc_optimizer, gen_optimizer, train_set, memory, use_EM, use_mcgn):
 
     save_checkpoint(total_examples=total_examples, fixed_noise=fixed_noise, gan=gan,
                     disc_loss_per_epoch=disc_loss_per_epoch,
                     gen_loss_per_epoch=gen_loss_per_epoch,
                     gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch, directory=checkpoint_dir,
                     disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer,
-                    train_set=train_set, memory=memory, use_EM=use_EM)
+                    train_set=train_set, memory=memory, use_EM=use_EM, use_mcgn=use_mcgn)
     print("Checkpoint saved!")
 
     # sample images for inspection

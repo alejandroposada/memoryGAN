@@ -22,11 +22,12 @@ def main():
     if args.model_file:
         try:
             total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, disc_loss_per_epoch, \
-            prev_epoch, gan, disc_optimizer, gen_optimizer, memory, use_EM \
+            prev_epoch, gan, disc_optimizer, gen_optimizer, memory, use_EM, use_mcgn \
                 = load_model(args.model_file, args.cuda, args.learning_rate, args.beta_0, args.beta_1)
             print('model loaded successfully! resuming from step {}'.format(prev_epoch))
             args.memory = memory   # prevents any contradictions during loading
             args.use_EM = use_EM
+            args.use_mcgn = use_mcgn
         except:
             print('could not load model! creating new model...')
             args.model_file = None
@@ -35,7 +36,8 @@ def main():
         print('creating new model...')
         total_examples, fixed_noise, gen_losses, disc_losses, gen_loss_per_epoch, disc_loss_per_epoch, \
         prev_epoch, gan, disc_optimizer, gen_optimizer \
-            = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0, args.beta_1, args.memory)
+            = create_new_model(args.train_set, args.cuda, args.learning_rate, args.beta_0,
+                               args.beta_1, args.memory, use_mcgn=args.use_mcgn)
 
     # results save folder
     gen_images_dir = 'results/generated_images'
@@ -90,7 +92,7 @@ def main():
                              checkpoint_dir=checkpoint_dir, is_cuda=args.cuda,
                              gen_images_dir=gen_images_dir, train_summaries_dir=train_summaries_dir,
                              disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer,
-                             train_set=args.train_set, memory=args.memory, use_EM=args.use_EM)
+                             train_set=args.train_set, memory=args.memory, use_EM=args.use_EM, use_mcgn=args.use_mcgn)
 
                 #  Collect information per epoch
                 disc_losses_epoch.append(disc_train_loss.item())
@@ -117,7 +119,7 @@ def main():
                  gen_losses=gen_losses, disc_losses=disc_losses, epoch=epoch,
                  checkpoint_dir=checkpoint_dir, is_cuda=args.cuda, gen_images_dir=gen_images_dir,
                  train_summaries_dir=train_summaries_dir, disc_optimizer=disc_optimizer, gen_optimizer=gen_optimizer,
-                 train_set=args.train_set, memory=args.memory, use_EM=args.use_EM)
+                 train_set=args.train_set, memory=args.memory, use_EM=args.use_EM, use_mcgn=args.use_mcgn)
 
 
 if __name__ == '__main__':
@@ -139,6 +141,7 @@ if __name__ == '__main__':
     argparser.add_argument('--seed', type=int, default=1024)
     argparser.add_argument('--memory', action='store_true', default=True)  # use memory?
     argparser.add_argument('--use_EM', action='store_true', default=True)  # use EM in memory?
+    argparser.add_argument('--use_mcgn', action='store_true', default=False)  # use mcgn, i.e, keys in generator?
     argparser.add_argument('--verbose', action='store_true', default=True)  # save internal memory info?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()

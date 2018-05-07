@@ -6,7 +6,7 @@ import torch.nn.functional as F
 class mcgn(nn.Module):
     """GENERATIVE MEMORY NETWORK
 	"""
-    def __init__(self, f_dim, fc_dim, z_dim, c_dim, key_dim):
+    def __init__(self, f_dim, fc_dim, z_dim, c_dim, key_dim, use_mcgn=True):
         """network: object which takes as input r_t and x_t and returns h_t
         """
         super(mcgn, self).__init__()
@@ -16,7 +16,10 @@ class mcgn(nn.Module):
         self.c_dim = c_dim
         self.key_dim = key_dim
 
-        self.fc1 = nn.Linear(z_dim+key_dim, fc_dim)
+        if use_mcgn:
+            self.fc1 = nn.Linear(z_dim+key_dim, fc_dim)
+        else:
+            self.fc1 = nn.Linear(z_dim, fc_dim)
         self.fc2 = nn.Linear(fc_dim, f_dim*2*5*5)
         self.conv1 = nn.ConvTranspose2d(in_channels=self.f_dim*2,
                                         out_channels=self.f_dim*2, kernel_size=4, stride=2)
