@@ -78,6 +78,8 @@ def main():
                     if (total_examples != 0) and (total_examples % args.display_result_every == 0):
                         print('avg hist: {:.4f} avg age: {:.5f} avg key val: {:.4f}'
                               .format(next_h.mean(), next_a.mean(), next_v.mean()))
+                        print('min: {:.3f}, max: {:.3f}, median: {:.3f} mean: {:.3f}'.format(
+                            next_h.min().item(), next_h.max().item(), next_h.median().item(), next_h.mean().item()))
 
                 # Checkpoint model
                 total_examples += args.batch_size
@@ -141,7 +143,7 @@ if __name__ == '__main__':
     argparser.add_argument('--seed', type=int, default=1024)
     argparser.add_argument('--memory', action='store_true', default=True)  # use memory?
     argparser.add_argument('--use_EM', action='store_true', default=True)  # use EM in memory?
-    argparser.add_argument('--use_mcgn', action='store_true', default=False)  # use mcgn, i.e, keys in generator?
+    argparser.add_argument('--use_mcgn', action='store_true', default=True)  # use mcgn, i.e, keys in generator?
     argparser.add_argument('--verbose', action='store_true', default=True)  # save internal memory info?
     argparser.add_argument('--grad_clip', type=int, default=10)
     args = argparser.parse_args()
