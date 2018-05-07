@@ -66,7 +66,8 @@ class memory(nn.Module):
         
         #  tile for multiple update
         rep_reset_mask = reset_mask.reshape([len(label), 1]).repeat(1, self.choose_k).reshape([-1])
-        rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
+        # rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
+        rep_oldest_idxs = self.get_oldest_idxs().repeat([len(label), 1]).reshape([-1])
         rep_q = q.unsqueeze(1).repeat([1, self.choose_k, 1]).reshape([-1, self.key_dim])
         rep_label = label.unsqueeze(1).repeat([1, self.choose_k]).reshape([-1])
         #print('labels {}'.format(label.sum().item()))
@@ -90,7 +91,7 @@ class memory(nn.Module):
             #  M step
             k_hat = k_hat * (1. - upd_ratio.unsqueeze(2).expand(-1, -1, self.key_dim))
             k_hat += upd_ratio.unsqueeze(2).expand(-1, -1, self.key_dim) * q.unsqueeze(1).repeat(1, self.choose_k, 1)
-            k_hat = normalize(k_hat, 1)
+            k_hat = normalize(k_hat, 2)
 
             gamma = next_gamma
 
@@ -101,6 +102,7 @@ class memory(nn.Module):
         upd_hists = torch.ones_like(rep_label)*self.memory_hist.mean()
         upd_hists.masked_scatter_(rep_reset_mask, h_hat.reshape([-1]))
         # print(rep_reset_mask.sum(0))
+
 
         self.memory_age += 1
         if self.is_cuda:
@@ -182,9 +184,11 @@ class memory(nn.Module):
         reset_mask = torch.eq(torch.zeros_like(sliced_hints), sliced_hints)
         return reset_mask  # 64
 
-    def get_oldest_idxs(self, batch_size):
-        _, oldest_idxs = torch.topk(self.memory_age, k=batch_size, sorted=False, largest=True)
-        return oldest_idxs.reshape([batch_size, 1])
+    def get_oldest_idxs(self):
+        _, oldest_idxs = torch.topk(self.memory_age, k=self.choose_k, sorted=False, largest=True)
+        #_, oldest_idxs = torch.topk(self.memory_age, k=batch_size, sorted=False, largest=True)
+        #return oldest_idxs.reshape([batch_size, 1])
+        return oldest_idxs
 
     def get_info_for_logging(self):
         return self.memory_hist.clone(), self.memory_key.clone(), self.memory_age.clone(), self.memory_values.clone()
@@ -197,7 +201,8 @@ class memory(nn.Module):
 
         #  tile for multiple update
         rep_reset_mask = reset_mask.reshape([len(label), 1]).repeat(1, self.choose_k).reshape([-1])
-        rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
+        #rep_oldest_idxs = self.get_oldest_idxs(len(label)).repeat([1, self.choose_k]).reshape([-1])
+        rep_oldest_idxs = self.get_oldest_idxs().repeat([len(label), 1]).reshape([-1])
         rep_q = q.unsqueeze(1).repeat([1, self.choose_k, 1]).reshape([-1, self.key_dim])
         rep_label = label.unsqueeze(1).repeat([1, self.choose_k]).reshape([-1])
 
@@ -205,7 +210,7 @@ class memory(nn.Module):
         k_hat = self.memory_key[k_idxs]  # 64x128x256
         v_hat = self.memory_values[k_idxs]  # 64x128, to be used in updates I guess
 
-        k_hat = normalize(k_hat + q.unsqueeze(1), 1)
+        k_hat = normalize(k_hat + q.unsqueeze(1), 2)
 
         upd_idxs = k_idxs.reshape([-1]).masked_scatter(rep_reset_mask, rep_oldest_idxs)
         upd_keys = k_hat.reshape([-1, self.key_dim]).masked_scatter(
@@ -231,20 +236,3 @@ class memory(nn.Module):
         del upd_idxs, upd_keys, upd_vals, upd_hists, rep_reset_mask, rep_oldest_idxs, rep_q, rep_label
         if self.is_cuda:
             torch.cuda.empty_cache()
-
-        '''
-        # compute similarity between batch of q and mem_keys
-        similarities = torch.matmul(q, torch.transpose(self.memory_key, 1, 0))
-        nearest_neighbours, idx = torch.topk(similarities, k=1)
-        for i in idx:
-            if self.memory_values[i] == label[i]:
-                self.memory_key[i] = (q[i] + self.memory_key[i]) / (q[i] + self.memory_key[i]).norm(2)
-                self.memory_age += 1
-                self.memory_age[i] = 0
-            else:
-                oldest_idx = torch.argmax(self.memory_age)
-                self.memory_key[oldest_idx] = q[i]
-                self.memory_key[oldest_idx] = 0
-                self.memory_values[oldest_idx] = label[i]
-        pass
-        '''
