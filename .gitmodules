@@ -1,0 +1,3 @@
+[submodule "memoryGAN_tf"]
+	path = memoryGAN_tf
+	url = https://github.com/alejandroposada/memoryGAN_tf
